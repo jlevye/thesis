@@ -1,0 +1,28 @@
+Program Structure
+Import File/Files
+- Need cases for batch analysis vs individual
+- file I/O code
+	- go to given file name or folder name
+	- if folder, read file names into list to iterate over
+	- keep control of working directory
+Color/Contrast Correction
+- Use ImageMagick commands in python shell
+	- Adjust contrast
+	- Threshold to b&w
+	- Rough edge detection?
+Intersection/Node detection algoritm
+	- Number nodes moving through image: possibly assign number to pixel location?
+	- Identify edges and adjacency
+		- Degree matrix from adjacency matrix? 
+		- Adjacency list? Less RAM use 
+	- Edge lengths (& widths?)
+
+Analysis
+	- Centrality
+	- Shortest geodesic path
+	- Maxiumum flow
+	- Minumum cut
+	- Eigenvalues
+
+GUI
+Choose between 
