@@ -7,23 +7,28 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+#import graphtool
+from classes import *
 
 #Classes
 class MainWindow(QMainWindow):
+    recordSignal = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.initUI()
+
     def initUI(self):
         #Picture widget
         #im = QImage()
-        #imLabel = QLabel(self)
-        #imLabel.setPixmap(QPixmap.fromImage(im))
 
+        imLabel = PicBox(self)
+        self.setCentralWidget(imLabel)
 
         #Actions
         openFile = QAction(QIcon(),"&Open", self)
         openFile.setShortcut("Ctrl+O")
-        openFile.triggered.connect(self.showOpenDialog)
+        openFile.triggered.connect(lambda: self.showOpenDialog(imLabel))
 
         saveFile = QAction(QIcon(),"&Save", self)
         saveFile.setShortcut("Ctrl+S")
@@ -33,9 +38,22 @@ class MainWindow(QMainWindow):
         exitAction.setShortcut("Ctrl+Q")
         exitAction.triggered.connect(qApp.quit)
 
+        #recordAction = QAction(QIcon(),"Record",self)
+        #recordAction.setCheckable(True)
+        #recordAction.toggled[bool].connect(self.recording)
+
         #Display
         menubar = self.menuBar()
-        self.statusBar().showMessage("Waiting.")
+        # toolbar = self.addToolBar("Record")
+        # toolbar.addAction(recordAction)
+
+        #Attempt 2 at buttons
+        buttonbar = ButtonWidget(self)
+        buttonDock = QDockWidget("Options")
+        buttonDock.setWidget(buttonbar)
+        self.addDockWidget(Qt.TopDockWidgetArea, buttonDock)
+
+        #self.statusBar().showMessage("Waiting.")
 
         fileMenu = menubar.addMenu("&File")
         fileMenu.addAction(openFile)
@@ -53,14 +71,12 @@ class MainWindow(QMainWindow):
         winDim.moveCenter(centPoint)
         self.move(winDim.topLeft())
 
-    def showOpenDialog(self):
+    def showOpenDialog(self,label):
         imname = QFileDialog.getOpenFileName(self, "Open Image", "/home")
         #i = open(imname)
         im = QImage()
         if im.load(imname[0]):
-            imLabel = QLabel(self)
-            imLabel.setPixmap(QPixmap.fromImage(im))
-            self.setCentralWidget(imLabel)
+            label.showImage(im)
             self.statusBar().showMessage("Image displayed.")
         else:
             self.statusBar().showMessage("Error")
@@ -68,11 +84,19 @@ class MainWindow(QMainWindow):
     def showSaveDialog(self):
         pass
 
-#Functions
+    def showList(self,label):
+        pass
+
+    def recording(self):
+            self.recordSignal.emit()
+            #self.statusBar().showMessage("Recording.")
+
 
 #Main
 if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     win = MainWindow()
+    imbox = PicBox(win)
+#    nodelist = ListDisplay(win)
     sys.exit(app.exec_())
