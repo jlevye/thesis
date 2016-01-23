@@ -22,7 +22,6 @@ class PicBox(QLabel):
 
         switch = self.mainwin.recordSignal.connect(self.recordValue)
         self.pointList = QListWidget()
-        #self.listpop = ListDisplay(self)
 
     def showImage(self, image):
         self.setPixmap(QPixmap.fromImage(image))
@@ -56,25 +55,34 @@ class ButtonWidget(QWidget):
         record.setCheckable(True)
 
         nodes = QPushButton("Nodes")
-        nodes.clicked.connect(self.mainwin.showList)
+        nodes.clicked.connect(self.nodeList)
 
         hbox.addWidget(record)
         hbox.addWidget(nodes)
         self.setLayout(hbox)
 
-    # def sizeHint(self):
-    #     return QSize(150,75)
+    def nodeList(self):
+        nodewin = ListDisplay(self.mainwin)
+        nodewin.show()
+        return nodewin
 
-# class ListDisplay(QDialog):
-#     def __init__(self,parent):
-#         super().__init__()
-#
-#         self.parent = parent
-#         x = 10
-#         for item in self.parent.pointList:
-#             lbl = QLabel(item,self)
-#             lbl.move(15,x)
-#             x += 10
-#
-#         self.setWindowTitle("Nodes")
-#         self.setGeometry(300,300,100,150)
+class ListDisplay(QDialog):
+    def __init__(self,mainwin):
+        super().__init__()
+
+        self.mainwin = mainwin
+        self.image = self.mainwin.imLabel
+        self.list = self.image.pointList
+
+        if self.image.picture == 0:
+            lbl = QLabel("No image loaded.",self)
+            lbl.move(15,10)
+        else:
+            x = 10
+            for index in range(0,self.list.count()):
+                lbl = QLabel(self.list.item(index),self)
+                lbl.move(15,x)
+                x += 10
+
+        self.setWindowTitle("Nodes")
+        self.setGeometry(300,300,100,150)

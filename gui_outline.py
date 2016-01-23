@@ -19,13 +19,21 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
+        #Setting up widgets
         #Picture widget
-        #im = QImage()
+        self.imLabel = PicBox(self)
+        self.setCentralWidget(self.imLabel)
 
-        imLabel = PicBox(self)
-        self.setCentralWidget(imLabel)
+        #Button Widget (Dockable 1)
+        self.buttonbar = ButtonWidget(self)
+        buttonDock = QDockWidget("Options")
+        buttonDock.setWidget(self.buttonbar)
+        self.addDockWidget(Qt.TopDockWidgetArea, buttonDock)
 
-        #Actions
+        #menus
+        menubar = self.menuBar()
+
+        #Menu actions
         openFile = QAction(QIcon(),"&Open", self)
         openFile.setShortcut("Ctrl+O")
         openFile.triggered.connect(lambda: self.showOpenDialog(imLabel))
@@ -38,33 +46,23 @@ class MainWindow(QMainWindow):
         exitAction.setShortcut("Ctrl+Q")
         exitAction.triggered.connect(qApp.quit)
 
-        #recordAction = QAction(QIcon(),"Record",self)
-        #recordAction.setCheckable(True)
-        #recordAction.toggled[bool].connect(self.recording)
-
-        #Display
-        menubar = self.menuBar()
-        # toolbar = self.addToolBar("Record")
-        # toolbar.addAction(recordAction)
-
-        #Attempt 2 at buttons
-        buttonbar = ButtonWidget(self)
-        buttonDock = QDockWidget("Options")
-        buttonDock.setWidget(buttonbar)
-        self.addDockWidget(Qt.TopDockWidgetArea, buttonDock)
-
-        #self.statusBar().showMessage("Waiting.")
-
+        #File Menu Entries
         fileMenu = menubar.addMenu("&File")
         fileMenu.addAction(openFile)
         fileMenu.addAction(saveFile)
         fileMenu.addSeparator()
         fileMenu.addAction(exitAction)
 
+        #recordAction = QAction(QIcon(),"Record",self)
+        #recordAction.setCheckable(True)
+        #recordAction.toggled[bool].connect(self.recording)
+
+        #Display the window
         self.resize(500,500)
         self.center()
         self.show()
 
+    #Other Methods Used
     def center(self):
         winDim = self.frameGeometry()
         centPoint = QDesktopWidget().availableGeometry().center()
@@ -84,13 +82,9 @@ class MainWindow(QMainWindow):
     def showSaveDialog(self):
         pass
 
-    def showList(self,label):
-        pass
-
     def recording(self):
             self.recordSignal.emit()
             #self.statusBar().showMessage("Recording.")
-
 
 #Main
 if __name__ == '__main__':
@@ -98,5 +92,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     win = MainWindow()
     imbox = PicBox(win)
-#    nodelist = ListDisplay(win)
     sys.exit(app.exec_())
