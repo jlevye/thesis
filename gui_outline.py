@@ -20,9 +20,11 @@ class MainWindow(QMainWindow):
 
     def initUI(self):
         #Setting up widgets
-        #Picture widget
+        #Picture widget and scroll box to contain it - doesn't show until you load a picture
         self.imLabel = PicBox(self)
-        self.setCentralWidget(self.imLabel)
+        self.scroll = QScrollArea()
+        self.scroll.ensureVisible(self.geometry().x(), self.geometry().y())
+        self.setCentralWidget(self.scroll)
 
         #Button Widget (Dockable 1)
         self.buttonbar = ButtonWidget(self)
@@ -36,7 +38,7 @@ class MainWindow(QMainWindow):
         #Menu actions
         openFile = QAction(QIcon(),"&Open", self)
         openFile.setShortcut("Ctrl+O")
-        openFile.triggered.connect(lambda: self.showOpenDialog(imLabel))
+        openFile.triggered.connect(lambda: self.showOpenDialog(self.imLabel))
 
         saveFile = QAction(QIcon(),"&Save", self)
         saveFile.setShortcut("Ctrl+S")
@@ -57,6 +59,9 @@ class MainWindow(QMainWindow):
         #recordAction.setCheckable(True)
         #recordAction.toggled[bool].connect(self.recording)
 
+        #Make a variable placeholder for a popup
+        self.nodewin = None
+        
         #Display the window
         self.resize(500,500)
         self.center()
@@ -71,10 +76,11 @@ class MainWindow(QMainWindow):
 
     def showOpenDialog(self,label):
         imname = QFileDialog.getOpenFileName(self, "Open Image", "/home")
-        #i = open(imname)
+        #i = open(imname)￼￼
         im = QImage()
         if im.load(imname[0]):
             label.showImage(im)
+            self.scroll.setWidget(label)
             self.statusBar().showMessage("Image displayed.")
         else:
             self.statusBar().showMessage("Error")
@@ -85,6 +91,7 @@ class MainWindow(QMainWindow):
     def recording(self):
             self.recordSignal.emit()
             #self.statusBar().showMessage("Recording.")
+
 
 #Main
 if __name__ == '__main__':
