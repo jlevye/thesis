@@ -1,0 +1,8 @@
+Vertex 0 at (26,176); r = 11
+Vertex 1 at (51,157); r = 11
+Vertex 2 at (107,114); r = 4
+Vertex 3 at (32,54); r = 4
+Vertex 4 at (101,7); r = 5
+Vertex 5 at (120,70); r = 13
+Vertex 6 at (150,38); r = 8
+Vertex 7 at (192,91); r = 9

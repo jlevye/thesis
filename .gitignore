@@ -1,0 +1,9 @@
+#Ignore image files
+/*.png
+/*.jpg
+/*.tiff
+
+#Exclude Reference files and misc files
+/RefCode
+/Misc
+

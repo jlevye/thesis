@@ -1,0 +1,23 @@
+Thesis Code GUI Notes
+Class definitions:
+
+MainWindow
+  Methods:
+    initUI - intializes the UI
+    center - centers the UI
+    showOpenDialog - lets you open a file
+    showSaveDialog - lets you save a file; currently blank
+    showList (?) - will show list of coordinates clicked
+  Attributes
+    imLabel - holds the pixmap image loaded and associated Methods, type PicBox
+    buttonbar - widget for buttons
+    buttonDock - dock for widget for buttons
+    menubar - bar for menus
+      fileMenu - menu for files on menubar
+        openFile - action for opening file
+        saveFile - action for saving file
+        exitAction - action for exiting
+
+PicBox
+  Methods:
+    recordValue - something with the getting a signal from another widget, or sending one
