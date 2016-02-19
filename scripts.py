@@ -5,19 +5,18 @@ from operator import add
 import copy
 
 
-#Points should be list; image is a numpy array
-def initGraph(points, image):
-    #g = Graph(directed=False) #For now; figure out directionality in future - v. important
+#Points should be list; image is a numpy array; source is the index of the "source" point in the image
+def initGraph(points, image, source = 0):
     g = Graph() #Attempting directionality
     disp = 600 #Size of display; this is defualt for graph_draw
     dim = image.shape[0] #Currently assumes image is square; will adjust later
 
-    #For debugging
-    f = open("log.txt","w")
-
     #Set up properties
     #Graph properties
+    gpropS = g.new_graph_property("int")
+    g.gp.source = gpropS
 
+    g.gp.source = source
 
     #Vertex properties
     vpropX = g.new_vertex_property("int") #x position
@@ -25,19 +24,23 @@ def initGraph(points, image):
     vpropR = g.new_vertex_property("int") #radius of largest circle that fit
     vpropBool = g.new_vertex_property("bool", vals = True) #Currently unused
     vpropCoord = g.new_vertex_property("vector<float>") #Coordinates for plotting
+    vpropLinDist = g.new_vertex_property("float")
     g.vp.x = vpropX
     g.vp.y = vpropY
     g.vp.r = vpropR
     g.vp.keep = vpropBool
     g.vp.coord = vpropCoord
+    g.vp.linDist = vpropLinDist
 
     #Edge properties
     epropFloat = g.new_edge_property("float")
     epropDiam = g.new_edge_property("int")
     epropMid = g.new_edge_property("vector<int>")
+    epropWidth = g.new_edge_property("int")
     g.ep.dist = epropFloat
     g.ep.d = epropDiam
     g.ep.mid = epropMid
+    g.ep.width = epropWidth
 
     #Other useful data containers, not attached as properties
     circleList = dict()
@@ -48,8 +51,7 @@ def initGraph(points, image):
         g.vp.x[v] = point[0]
         g.vp.y[v] = point[1]
         g.vp.r[v] = biggestCircle(point, image)
-
-        f.write("Vertex {v} at ({x},{y}); r = {r}\n".format(v = int(v), x = g.vp.x[v], y = g.vp.y[v], r = g.vp.r[v]))
+        g.vp.linDist[v] = distance(points[source], point)
 
         circleList.update({"({x},{y})".format(x = g.vp.x[v], y = g.vp.y[v]):makeCircle(point, g.vp.r[v], image.shape)})
 
@@ -72,22 +74,35 @@ def initGraph(points, image):
             u = g.vertex(n[1])
             d = n[0]
             if isEdge([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]], image, points, circleList):
-                #Three scenarios for option A of directionality.
-                if g.vp.r[v] > g.vp.r[u]:
+                # #Three scenarios for option A of directionality.
+                # if g.vp.r[v] > g.vp.r[u]:
+                #     e = g.add_edge(v,u)
+                #     g.ep.dist[e] = d
+                #     g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+                # elif g.vp.r[v] < g.vp.r[u]:
+                #     e = g.add_edge(u,v)
+                #     g.ep.dist[e] = d
+                #     g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+                # else:
+                #     e1 = g.add_edge(u,v)
+                #     e2 = g.add_edge(v,u)
+                #     g.ep.dist[e1] = d
+                #     g.ep.dist[e2] = d
+                #     g.ep.mid[e1] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+                #     g.ep.mid[e2] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+                #Two scenarios for option B of directionality
+                if g.vp.linDist[v] < g.vp.linDist[u]:
                     e = g.add_edge(v,u)
-                    g.ep.dist[e] = d
-                    g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
-                elif g.vp.r[v] < g.vp.r[u]:
-                    e = g.add_edge(u,v)
-                    g.ep.dist[e] = d
-                    g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
                 else:
-                    e1 = g.add_edge(u,v)
-                    e2 = g.add_edge(v,u)
-                    g.ep.dist[e1] = d
-                    g.ep.dist[e2] = d
-                    g.ep.mid[e1] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
-                    g.ep.mid[e2] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+                    e = g.add_edge(u,v)
+                g.ep.dist[e] = d
+                g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+
+
+    #Add edge widths
+    for e in g.edges():
+        g.ep.width[e] = perpWidth(g, e, image)
+
     return g
 
 #Distance formula; x and y are lists or tuples
@@ -130,7 +145,6 @@ def isEdge(a, b, im, points, cirDict, thresh = 1):
         if distance(c, b) < minDist:
             minDist = distance(c,b)
             newpoint = c
-            print(newpoint)
     a = newpoint
 
     #Add the rest of the circle points to p
@@ -162,7 +176,6 @@ def isEdge(a, b, im, points, cirDict, thresh = 1):
                 stop=1
         else:
             stop = 1
-        print(end)
     return True if end in endzone else False
 
 #Quick function to invert an image, formatted as a numpy array
@@ -227,8 +240,8 @@ def makeCircle(x0, r, max=None):
 #x: center of circle (tuple or list)
 #im: image array (np.array)
 #thresh: cut off point, defaults such that anything above 0 is included
-def isCircle(r, x, im):
-    circlePoints = makeCircle(x, r, max = im.shape, thresh = 1)
+def isCircle(r, x, im, thresh = 1):
+    circlePoints = makeCircle(x, r, max = im.shape)
     for point in circlePoints:
         a = point[0]
         b = point[1]
@@ -258,15 +271,20 @@ def fullCircle(x, r, m = None):
 
 #Perpendicular width
 #Inputs - Edge object of interest, numpy image array
-def perpWidth(e, im, thresh = 1):
+def perpWidth(g, e, im, thresh = 1):
     s = e.source()
     t = e.target()
     d = g.ep.dist[e]
-    p1 = g.ep.mid[e]
-    p2 = g.ep.mid[e]
+    p1 = list(g.ep.mid[e])
+    p2 = list(g.ep.mid[e])
 
     rise = g.vp.y[t] - g.vp.y[s]
     run = g.vp.x[t] - g.vp.x[s]
+
+    #Perpendicular slope
+    slope = -1 * (run/rise)
+
+    print("Edge {index}: start = [{x1},{y1}]; end = [{x2},{y2}]; mid = [{x3},{y3}], slope = {slope}".format(index = g.edge_index[e], x1 = g.vp.x[s], y1 = g.vp.y[s], x2 = g.vp.x[t], y2 = g.vp.y[t], x3 = p1[0], y3 = p1[1], slope = slope))
 
     counter = 1
     end1 = 0
@@ -275,31 +293,35 @@ def perpWidth(e, im, thresh = 1):
     #Moving along the line, until both ends hit white
     while end1 == 0 or end2 == 0:
         if rise == 0: #Horizontal line
+            p1[0] += 1
+            p2[0] -= 1
         elif run == 0: #Vertical line
             p1[1] += 1
             p2[1] -= 1
         else:
-            p1[0] += 1
-            p2[0] -= 1
             #Four possible directions for p1 (p2 goes opposite)
             if 0 < slope < 1:
                 lineInc(p1, 0, slope)
                 lineInc(p2, 4, slope)
-            elif: slope >= 1
-                lineInc(p1, 1, slope)
-                lineInc(p2, 4, slope)
+            elif slope >= 1:
+                p1 = lineInc(p1, 1, slope)
+                p2 = lineInc(p2, 4, slope)
             elif slope <= -1:
                 lineInc(p1, 2, slope)
                 lineInc(p2, 6, slope)
             elif -1 < slope < 0:
                 lineInc(p1, 3, slope)
                 lineInc(p2, 7, slope)
-
+        print("({x1},{y1}); ({x2},{y2})".format(x1 = p1[0], y1 = p1[1], y2 = p2[1], x2 = p2[0]))
         #Test the points
-        if im[p1[1]][p1[0]] < thresh: end1 = 1
-        else: counter += 1
-        if im[p2[1]][p2[0]] < thresh: end2 = 1
-        else: counter += 1
+        if im[p1[1]][p1[0]] < thresh:
+            end1 = 1
+        else:
+            counter += 1
+        if im[p2[1]][p2[0]] < thresh:
+            end2 = 1
+        else:
+            counter += 1
 
     return counter
 
@@ -332,8 +354,9 @@ def lineInc(p, oct, slope):
                 p[0] = round(p[0] + slope)
             else:
                 p[0] = round(p[0] - slope)
+    return p
 
 def midpoint(a,b):
-    m0 = abs(int((a[0] - b[0])/2))
-    m1 = abs(int((a[1] - b[1])/2))
+    m0 = int((a[0] + b[0])/2)
+    m1 = int((a[1] + b[1])/2)
     return [m0,m1]
