@@ -2,6 +2,7 @@ from graph_tool.all import *
 import math
 import numpy as np
 from operator import add
+import copy
 
 
 #Points should be list; image is a numpy array
@@ -15,6 +16,10 @@ def initGraph(points, image):
     f = open("log.txt","w")
 
     #Set up properties
+    #Graph properties
+
+
+    #Vertex properties
     vpropX = g.new_vertex_property("int") #x position
     vpropY = g.new_vertex_property("int") #y positon
     vpropR = g.new_vertex_property("int") #radius of largest circle that fit
@@ -26,8 +31,13 @@ def initGraph(points, image):
     g.vp.keep = vpropBool
     g.vp.coord = vpropCoord
 
+    #Edge properties
     epropFloat = g.new_edge_property("float")
+    epropDiam = g.new_edge_property("int")
+    epropMid = g.new_edge_property("vector<int>")
     g.ep.dist = epropFloat
+    g.ep.d = epropDiam
+    g.ep.mid = epropMid
 
     #Other useful data containers, not attached as properties
     circleList = dict()
@@ -52,7 +62,7 @@ def initGraph(points, image):
     N = g.num_vertices() #Adjust this as needed
     #N = 5
     #Start with a list of vertices you can pop from to only check pairs one at a time
-    checkList = list(range(g.num_vertices())) #Duplicate for debugging purposes
+    checkList = list(range(g.num_vertices())) #List to remove from, possibly reduntant but fixes error from earlier.
     for i in range(g.num_vertices()):
         v = g.vertex(i)
         checkList.remove(i)
@@ -62,63 +72,74 @@ def initGraph(points, image):
             u = g.vertex(n[1])
             d = n[0]
             if isEdge([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]], image, points, circleList):
+                #Three scenarios for option A of directionality.
                 if g.vp.r[v] > g.vp.r[u]:
                     e = g.add_edge(v,u)
                     g.ep.dist[e] = d
+                    g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
                 elif g.vp.r[v] < g.vp.r[u]:
                     e = g.add_edge(u,v)
                     g.ep.dist[e] = d
+                    g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
                 else:
-                    e = g.add_edge(u,v)
-                    f = g.add_edge(v,u)
-                    g.ep.dist[e] = d
-                    g.ep.dist[f] = d
+                    e1 = g.add_edge(u,v)
+                    e2 = g.add_edge(v,u)
+                    g.ep.dist[e1] = d
+                    g.ep.dist[e2] = d
+                    g.ep.mid[e1] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+                    g.ep.mid[e2] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+    return g
 
-    return g, circleList
-
+#Distance formula; x and y are lists or tuples
 def distance(x, y):
     return math.sqrt((x[0] - y[0])**2 + (x[1]- y[1])**2)
 
 #gets the N nearest neighbors around a point center from a list points; returns coordinates of those points
 def neighbors(center, g, indices, N):
-    #vertexList = find_vertex(g, g.vp.vertex_index in indices)
     d = [(distance([g.vp.x[center], g.vp.y[center]], [g.vp.x[i], g.vp.y[i]]), i) for i in indices]
     d.sort()
     nearest = d[0:N]
     return nearest
 
 #Given an image and two coordinates, checks if edge between them
-#Knowing direction to travel, if can find threshold path up to the target
-#Note that np arrays are indexed as array[y][x] and bottom > top
-#cir is a dictionary that matches a coordinate pair to the largest circle that surrounds it - to find the closest point around the center to the target point (ideally to solve problem of thick lines)
+#
+#Inputs
+#a, b: coordinate points, lists preferred type
+#im: a numpy array of an image.
+#points: a list of coordinates of all nodes; will be copied to not change original
+#cirDict: a dictionary, where key is coordinate pair from points and value is a list of the largest circle surrounding that point; will be copied to not change original
+#thresh: include if there is a grayscale threshold
+#
+#Process
+#
 def isEdge(a, b, im, points, cirDict, thresh = 1):
     if a == b: return False
-    #print("a = (%d, %d), b = (%d,%d)" % tuple([a[0],a[1] ,b[0],b[1]]))
+
     p = points[:]
-    p.remove(a)
-    #p.remove(b)
+    p.remove(a) #Don't include starting point in list to test against
 
-    cir = cirDict.copy() #To protect the other one for what we're about to do to it
     #Find the point on the circle around start that is closest to the target; reassign that to target
+    cir = copy.deepcopy(cirDict)#To protect the other one for what we're about to do to it
     keyA = "({x},{y})".format(x = a[0], y = a[1])
-    keyB = "({x},{y})".format(x = b[0], y = b[1])
     circle = cir[keyA]
-
-    endzone = fullCircle(b, biggestCircle(b,im), im.shape)
-
     del cir[keyA]
+
     newpoint = a
     minDist = 999999
     for c in circle:
         if distance(c, b) < minDist:
             minDist = distance(c,b)
             newpoint = c
+            print(newpoint)
     a = newpoint
 
     #Add the rest of the circle points to p
     for item in cir.values():
         for point in item:
             p.append(point)
+
+    #Create the target zone to check termination
+    endzone = fullCircle(b, biggestCircle(b,im), im.shape)
 
     h = -1 if a[0] > b[0] else 1 #Move left or right
     v = -1 if a[1] > b[1] else 1 #Move up or down
@@ -127,26 +148,19 @@ def isEdge(a, b, im, points, cirDict, thresh = 1):
     end = a
     stop = 0
     while stop == 0:
-        print("Current X = {x0}. Current Y = {y0}\n".format(x0 = end[0], y0 = end[1]))
-        print("Target is ({x},{y})\n".format(x = b[0], y = b[1]))
-        print("Value is {a}".format(a = im[end[1]][end[0]]))
         if end[0] != b[0] and end[0] + h < maxx and im[end[1]][end[0] + h] > thresh:
             end[0] += h
             if end in p:
                 stop=1
-                print("Moved horizontal by one; hide another point.")
         elif end[1] != b[1] and end[1] + v < maxy and im[end[1] + v][end[0]] > thresh:
             end[1] += v
             if end in p:
                 stop=1
-                print("Moved vertical by one, hit another point.")
         elif end != b and end[0] + h < maxx and end[1] + v < maxy and im[end[1]+v][end[0]+h] > thresh:
             end = list(map(add, end, [h,v]))
             if end in p:
                 stop=1
-                print("Moved diagonal, hit another point.")
         else:
-            print("No conditions met?")
             stop = 1
         print(end)
     return True if end in endzone else False
@@ -158,8 +172,13 @@ def invert(imArray):
     for x in np.nditer(imArray, op_flags=["readwrite"]):
         x[...] = (x - 255)*-1
 
-#Functions to identify area around a center point (attempting to identify diameter, for example)
-#Identifying points on a circle based on Bresenham's Circle Algorithm; x0 is a pair of points (tuple or list), r is an integer,
+#Functions related to circles around a point
+
+#Identifying points on a circle based on Bresenham's Circle Algorithm
+#Inputs
+#x0 is a coorinate pair (tuple or list)
+#r is an integer
+#max matters if corners might be a problem
 def makeCircle(x0, r, max=None):
     p = list()
     if r == 0:
@@ -169,11 +188,13 @@ def makeCircle(x0, r, max=None):
     if max is not None:
         x_max = max[0]
         y_max = max[1]
+
     x = x0[0]
     y = x0[1]
     i = 0
-    decisionOver2 = 1 - r
+    decisionOver2 = 1 - r #Start for decision criteria for algorithm
 
+    #Computes points
     while i < r:
         p.append([r + x,  i + y]) #Octant 1
         p.append([i + x,  r + y]) #Octant 2
@@ -200,19 +221,27 @@ def makeCircle(x0, r, max=None):
 
     return p
 
-#Given a radius (integer), a midpoint (tuple or list), and an image array (np.array) see if all the points are under the threshold; currently hardcoded as 127
+#Determine if a circle of a given size can fall entirely above threshold in an image
+#Inputs
+#r: radius of circle, integer
+#x: center of circle (tuple or list)
+#im: image array (np.array)
+#thresh: cut off point, defaults such that anything above 0 is included
 def isCircle(r, x, im):
-    circlePoints = makeCircle(x, r, max = im.shape)
+    circlePoints = makeCircle(x, r, max = im.shape, thresh = 1)
     for point in circlePoints:
         a = point[0]
         b = point[1]
-        if im[b][a] == 0: #Currently hardcoding threshold for purely binary image - fix later!
+        if im[b][a] < thresh:
             return False
+    #Returns true if never returned false
     return True
 
-#Uses the image and a point to find the radius of the biggest circle
+#Find the biggest possible circle contained in target area around a point in an image. x is a center point (list or tuple); im is a numpy array.
+#Potential issue: will never return for solid black image?
 def biggestCircle(x, im):
     r = 0
+    #Increments R until no longer possible to draw circle, then returns.
     while isCircle(r, x, im):
         r += 1
     else:
@@ -226,3 +255,85 @@ def fullCircle(x, r, m = None):
         for point in ring: p.append(point)
         r -= 1
     return p
+
+#Perpendicular width
+#Inputs - Edge object of interest, numpy image array
+def perpWidth(e, im, thresh = 1):
+    s = e.source()
+    t = e.target()
+    d = g.ep.dist[e]
+    p1 = g.ep.mid[e]
+    p2 = g.ep.mid[e]
+
+    rise = g.vp.y[t] - g.vp.y[s]
+    run = g.vp.x[t] - g.vp.x[s]
+
+    counter = 1
+    end1 = 0
+    end2 = 0
+
+    #Moving along the line, until both ends hit white
+    while end1 == 0 or end2 == 0:
+        if rise == 0: #Horizontal line
+        elif run == 0: #Vertical line
+            p1[1] += 1
+            p2[1] -= 1
+        else:
+            p1[0] += 1
+            p2[0] -= 1
+            #Four possible directions for p1 (p2 goes opposite)
+            if 0 < slope < 1:
+                lineInc(p1, 0, slope)
+                lineInc(p2, 4, slope)
+            elif: slope >= 1
+                lineInc(p1, 1, slope)
+                lineInc(p2, 4, slope)
+            elif slope <= -1:
+                lineInc(p1, 2, slope)
+                lineInc(p2, 6, slope)
+            elif -1 < slope < 0:
+                lineInc(p1, 3, slope)
+                lineInc(p2, 7, slope)
+
+        #Test the points
+        if im[p1[1]][p1[0]] < thresh: end1 = 1
+        else: counter += 1
+        if im[p2[1]][p2[0]] < thresh: end2 = 1
+        else: counter += 1
+
+    return counter
+
+#Requires line is not vertical
+def lineInc(p, oct, slope):
+    slope = abs(slope)
+    if oct in [0,3,4,7]:
+        if oct in [0,7]:
+            p[0] += 1
+            if oct == 0:
+                p[1] = round(p[1] + slope)
+            else:
+                p[1] = round(p[1] - slope)
+        else:
+            p[0] -= 1
+            if oct == 3:
+                p[1] = round(p[1] + slope)
+            else:
+                p[1] = round(p[1] - slope)
+    else:
+        if oct in [1,2]:
+            p[1] += 1
+            if oct == 1:
+                p[0] = round(p[0] + slope)
+            else:
+                p[0] = round(p[0] - slope)
+        else:
+            p[1] -= 1
+            if oct == 1:
+                p[0] = round(p[0] + slope)
+            else:
+                p[0] = round(p[0] - slope)
+
+def midpoint(a,b):
+    m0 = abs(int((a[0] - b[0])/2))
+    m1 = abs(int((a[1] - b[1])/2))
+    return [m0,m1]
