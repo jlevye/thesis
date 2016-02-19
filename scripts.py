@@ -284,12 +284,9 @@ def perpWidth(g, e, im, thresh = 1):
     #Perpendicular slope
     slope = -1 * (run/rise)
 
-    print("Edge {index}: start = [{x1},{y1}]; end = [{x2},{y2}]; mid = [{x3},{y3}], slope = {slope}".format(index = g.edge_index[e], x1 = g.vp.x[s], y1 = g.vp.y[s], x2 = g.vp.x[t], y2 = g.vp.y[t], x3 = p1[0], y3 = p1[1], slope = slope))
-
     counter = 1
     end1 = 0
     end2 = 0
-
     #Moving along the line, until both ends hit white
     while end1 == 0 or end2 == 0:
         if rise == 0: #Horizontal line
@@ -312,7 +309,6 @@ def perpWidth(g, e, im, thresh = 1):
             elif -1 < slope < 0:
                 lineInc(p1, 3, slope)
                 lineInc(p2, 7, slope)
-        print("({x1},{y1}); ({x2},{y2})".format(x1 = p1[0], y1 = p1[1], y2 = p2[1], x2 = p2[0]))
         #Test the points
         if im[p1[1]][p1[0]] < thresh:
             end1 = 1
@@ -322,7 +318,6 @@ def perpWidth(g, e, im, thresh = 1):
             end2 = 1
         else:
             counter += 1
-
     return counter
 
 #Requires line is not vertical
