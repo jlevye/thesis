@@ -9,6 +9,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 #import graphtool
 from classes import *
+import data_manage as dm
 
 #Classes
 class MainWindow(QMainWindow):
@@ -41,7 +42,6 @@ class MainWindow(QMainWindow):
         openFile.triggered.connect(lambda: self.showOpenDialog(self.imLabel))
 
         saveFile = QAction(QIcon(),"&Save", self)
-        saveFile.setShortcut("Ctrl+S")
         saveFile.triggered.connect(self.showSaveDialog)
 
         exitAction = QAction(QIcon(),"&Quit", self)
@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
 
         #Make a variable placeholder for a popup
         self.nodewin = None
-        
+
         #Display the window
         self.resize(500,500)
         self.center()

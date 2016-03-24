@@ -5,6 +5,7 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+import data_manage as dm
 
 class PicBox(QLabel):
     def __init__(self,mainwin):

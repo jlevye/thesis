@@ -1,15 +1,19 @@
+##Bug notes 3/24: Currently gets stuck in infinate (or stupidly long) loop on a one edge in an example real image. Misses many edges in real image. 
+
 from graph_tool.all import *
 import math
 import numpy as np
 from operator import add
 import copy
+import itertools
 
 
 #Points should be list; image is a numpy array; source is the index of the "source" point in the image
 def initGraph(points, image, source = 0):
+    print("Starting!")
     g = Graph() #Attempting directionality
     disp = 600 #Size of display; this is defualt for graph_draw
-    dim = image.shape[0] #Currently assumes image is square; will adjust later
+    dim = [image.shape[1],image.shape[0]]
 
     #Set up properties
     #Graph properties
@@ -56,16 +60,21 @@ def initGraph(points, image, source = 0):
         circleList.update({"({x},{y})".format(x = g.vp.x[v], y = g.vp.y[v]):makeCircle(point, g.vp.r[v], image.shape)})
 
         #Adjusts the coordinates to fit display size - for debugging
-        g.vp.coord[v] = [(x+1)*disp/dim for x in point]
+        g.vp.coord[v] = [(x+1)*disp/y for x,y in zip(point,dim)]
         if g.vp.coord[v][0] == disp: g.vp.coord[v][0] = disp-1
         if g.vp.coord[v][1] == disp: g.vp.coord[v][1] = disp-1
 
+    print("Finished the vertices!")
+
     #Set up edges
-    N = g.num_vertices() #Adjust this as needed
-    #N = 5
+    #N = g.num_vertices() #Adjust this as needed
+    N = 20
     #Start with a list of vertices you can pop from to only check pairs one at a time
     checkList = list(range(g.num_vertices())) #List to remove from, possibly reduntant but fixes error from earlier.
+
     for i in range(g.num_vertices()):
+        percent = math.floor(i/g.num_vertices()*100)
+        if percent % 10 == 0: print("Processed {x}% of possible starting edges.".format(x = percent))
         v = g.vertex(i)
         checkList.remove(i)
         near = neighbors(v, g, checkList, N)
@@ -98,11 +107,14 @@ def initGraph(points, image, source = 0):
                 g.ep.dist[e] = d
                 g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
 
-
+    print("Finished edges!")
     #Add edge widths
-    for e in g.edges():
-        g.ep.width[e] = perpWidth(g, e, image)
+    # for e in g.edges():
+    #     percent = math.floor(g.edge_index[e]/g.num_edges()*100)
+    #     if percent % 10 == 0: print("Processed {x}% of possible starting edges.".format(x = percent))
+    #     g.ep.width[e] = perpWidth(g, e, image)
 
+    print("Done!")
     return g
 
 #Distance formula; x and y are lists or tuples
@@ -162,11 +174,11 @@ def isEdge(a, b, im, points, cirDict, thresh = 1):
     end = a
     stop = 0
     while stop == 0:
-        if end[0] != b[0] and end[0] + h < maxx and im[end[1]][end[0] + h] > thresh:
+        if end[0] != b[0] and end[0] + h < maxy and im[end[1]][end[0] + h] > thresh:
             end[0] += h
             if end in p:
                 stop=1
-        elif end[1] != b[1] and end[1] + v < maxy and im[end[1] + v][end[0]] > thresh:
+        elif end[1] != b[1] and end[1] + v < maxx and im[end[1] + v][end[0]] > thresh:
             end[1] += v
             if end in p:
                 stop=1
@@ -282,7 +294,7 @@ def perpWidth(g, e, im, thresh = 1):
     run = g.vp.x[t] - g.vp.x[s]
 
     #Perpendicular slope
-    slope = -1 * (run/rise)
+    if rise != 0: slope = -1 * (run/rise)
 
     counter = 1
     end1 = 0
@@ -310,14 +322,19 @@ def perpWidth(g, e, im, thresh = 1):
                 lineInc(p1, 3, slope)
                 lineInc(p2, 7, slope)
         #Test the points
-        if im[p1[1]][p1[0]] < thresh:
+        if p1[0] == im.shape[1] or p1[1] >= im.shape[0]:
             end1 = 1
-        else:
-            counter += 1
-        if im[p2[1]][p2[0]] < thresh:
+        elif p2[0] == im.shape[1] or p2[1] >= im.shape[0]:
             end2 = 1
         else:
-            counter += 1
+            if im[p1[1]][p1[0]] < thresh:
+                end1 = 1
+            else:
+                counter += 1
+                if im[p2[1]][p2[0]] < thresh:
+                    end2 = 1
+                else:
+                    counter += 1
     return counter
 
 #Requires line is not vertical
