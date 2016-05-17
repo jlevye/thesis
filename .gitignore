@@ -6,4 +6,7 @@
 #Exclude Reference files and misc files
 /RefCode
 /Misc
+/Icons
 
+#Exceptions to exclusions
+!/Testing/*.png

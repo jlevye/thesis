@@ -16,4 +16,4 @@ Thick <- ggplot(monoculture, aes(x = Species, y = ThickMean, fill = Type)) + geo
 
 
 ggsave("../sla.png",SLA)
-ggsave("../thick.png",Thick)
+ggsave("../thick.png", Thick)
