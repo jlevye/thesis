@@ -7,6 +7,7 @@
 /RefCode
 /Misc
 /Icons
+/__pycache__
 
 #Exceptions to exclusions
 !/Testing/*.png
