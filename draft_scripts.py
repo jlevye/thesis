@@ -1,19 +1,21 @@
-##Bug notes 3/24: Currently gets stuck in infinate (or stupidly long) loop on a one edge in an example real image. Misses many edges in real image. 
+#!/usr/bin/python3
+"""Scripts for generating graphs from images and lists of points"""
 
-from graph_tool.all import *
 import math
-import numpy as np
 from operator import add
 import copy
-import itertools
+import numpy as np
+import graph_tool.all as gt
 
 
-#Points should be list; image is a numpy array; source is the index of the "source" point in the image
-def initGraph(points, image, source = 0):
+#USAGE
+#points are a list; source is the source point
+#image is a numpy array
+def initGraph(points, image, source=0):
     print("Starting!")
-    g = Graph() #Attempting directionality
+    g = gt.Graph() #Attempting directionality
     disp = 600 #Size of display; this is defualt for graph_draw
-    dim = [image.shape[1],image.shape[0]]
+    dim = [image.shape[1], image.shape[0]]
 
     #Set up properties
     #Graph properties
@@ -26,7 +28,7 @@ def initGraph(points, image, source = 0):
     vpropX = g.new_vertex_property("int") #x position
     vpropY = g.new_vertex_property("int") #y positon
     vpropR = g.new_vertex_property("int") #radius of largest circle that fit
-    vpropBool = g.new_vertex_property("bool", vals = True) #Currently unused
+    vpropBool = g.new_vertex_property("bool", vals=True) #Currently unused
     vpropCoord = g.new_vertex_property("vector<float>") #Coordinates for plotting
     vpropLinDist = g.new_vertex_property("float")
     g.vp.x = vpropX
@@ -57,10 +59,12 @@ def initGraph(points, image, source = 0):
         g.vp.r[v] = biggestCircle(point, image)
         g.vp.linDist[v] = distance(points[source], point)
 
-        circleList.update({"({x},{y})".format(x = g.vp.x[v], y = g.vp.y[v]):makeCircle(point, g.vp.r[v], image.shape)})
+        key = "({x},{y})".format(x=g.vp.x[v], y=g.vp.y[v])
+        value = makeCircle(point, g.vp.r[v], image.shape)
+        circleList[key] = value
 
         #Adjusts the coordinates to fit display size - for debugging
-        g.vp.coord[v] = [(x+1)*disp/y for x,y in zip(point,dim)]
+        g.vp.coord[v] = [(x+1)*disp/y for x, y in zip(point,dim)]
         if g.vp.coord[v][0] == disp: g.vp.coord[v][0] = disp-1
         if g.vp.coord[v][1] == disp: g.vp.coord[v][1] = disp-1
 
@@ -70,11 +74,12 @@ def initGraph(points, image, source = 0):
     #N = g.num_vertices() #Adjust this as needed
     N = 20
     #Start with a list of vertices you can pop from to only check pairs one at a time
-    checkList = list(range(g.num_vertices())) #List to remove from, possibly reduntant but fixes error from earlier.
+    checkList = list(range(g.num_vertices())) #List to remove from
 
     for i in range(g.num_vertices()):
         percent = math.floor(i/g.num_vertices()*100)
-        if percent % 10 == 0: print("Processed {x}% of possible starting edges.".format(x = percent))
+        if percent % 10 == 0:
+            print("Processed {x}% of possible starting edges.".format(x = percent))
         v = g.vertex(i)
         checkList.remove(i)
         near = neighbors(v, g, checkList, N)
@@ -82,7 +87,7 @@ def initGraph(points, image, source = 0):
         for n in near:
             u = g.vertex(n[1])
             d = n[0]
-            if isEdge([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]], image, points, circleList):
+            if isEdge([g.vp.x[v], g.vp.y[v]], [g.vp.x[u], g.vp.y[u]], image, points, circleList):
                 # #Three scenarios for option A of directionality.
                 # if g.vp.r[v] > g.vp.r[u]:
                 #     e = g.add_edge(v,u)
@@ -101,14 +106,14 @@ def initGraph(points, image, source = 0):
                 #     g.ep.mid[e2] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
                 #Two scenarios for option B of directionality
                 if g.vp.linDist[v] < g.vp.linDist[u]:
-                    e = g.add_edge(v,u)
+                    e = g.add_edge(v, u)
                 else:
-                    e = g.add_edge(u,v)
+                    e = g.add_edge(u, v)
                 g.ep.dist[e] = d
-                g.ep.mid[e] = midpoint([g.vp.x[v],g.vp.y[v]], [g.vp.x[u],g.vp.y[u]])
+                g.ep.mid[e] = midpoint([g.vp.x[v], g.vp.y[v]], [g.vp.x[u], g.vp.y[u]])
 
     print("Finished edges!")
-    #Add edge widths
+    #Adds edge widths
     # for e in g.edges():
     #     percent = math.floor(g.edge_index[e]/g.num_edges()*100)
     #     if percent % 10 == 0: print("Processed {x}% of possible starting edges.".format(x = percent))
@@ -122,7 +127,8 @@ def distance(x, y):
     return math.sqrt((x[0] - y[0])**2 + (x[1]- y[1])**2)
 
 #gets the N nearest neighbors around a point center from a list points; returns coordinates of those points
-def neighbors(center, g, indices, N):
+def neighbors(center, graph, indices, N):
+    g = graph
     d = [(distance([g.vp.x[center], g.vp.y[center]], [g.vp.x[i], g.vp.y[i]]), i) for i in indices]
     d.sort()
     nearest = d[0:N]
@@ -159,7 +165,7 @@ def isEdge(a, b, im, points, cirDict, thresh = 1):
             newpoint = c
     a = newpoint
 
-    #Add the rest of the circle points to p
+    #Adds the rest of the circle points to p
     for item in cir.values():
         for point in item:
             p.append(point)
@@ -183,7 +189,7 @@ def isEdge(a, b, im, points, cirDict, thresh = 1):
             if end in p:
                 stop=1
         elif end != b and end[0] + h < maxx and end[1] + v < maxy and im[end[1]+v][end[0]+h] > thresh:
-            end = list(map(add, end, [h,v]))
+            end = list(map(add, end, [h, v]))
             if end in p:
                 stop=1
         else:
