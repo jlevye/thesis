@@ -20,13 +20,14 @@ def read_points(filename):
     """Read and convert to integers the points in a csv."""
 
     #TODO: handle if a file has headers.
+    #TODO: Handle if file has an extra column.
     with open(filename,"r") as f:
         pointread = csv.reader(f)
         points = list(pointread)
 
     for point in points:
-        point[0] = int(point[0])
-        point[1] = int(point[1])
+        point[0] =round(float(point[0]))
+        point[1] =round(float(point[1]))
     return points
 
 def read_image(filename):
@@ -125,8 +126,8 @@ def add_all_vertices(graph, points, image, dim, disp):
         if g.vp.coord[v][1] == disp: g.vp.coord[v][1] = disp-1
 
 #Edge-related scripts
-def is_edge(a, b, im, points, cirDict, thresh=1):
-    """Determines of an edge connects two points. Glitches on curves."""
+def is_edge(a, b, im, points, cir, thresh=1):
+    """Determines of an edge connects two points. Glitches on jagged lines."""
 
     if a == b:
         return False
@@ -136,11 +137,12 @@ def is_edge(a, b, im, points, cirDict, thresh=1):
     height = im.shape[0] - 1
     width = im.shape[1] - 1
 
-    cir = copy.deepcopy(cirDict)
     keyA = "({x},{y})".format(x = a[0], y = a[1])
     circle = cir[keyA]
+    backup_circle = [[x for x in point] for point in circle]
     del cir[keyA]
 
+    orig_a = a[:]
     newpoint = a
     minDist = 999999
     for c in circle:
@@ -186,12 +188,18 @@ def is_edge(a, b, im, points, cirDict, thresh=1):
             if end in p: stop=1
         else:
             stop = 1
+
+    a = orig_a
+    cir[keyA] = backup_circle
     return True if end in endzone else False
 
 #TODO: Improve speed of this process!
-def edge_tester(points, image, circle):
+def edge_tester(pointsOrig, image, circle):
     """Given a list of points, checks the possible edges between them. Slow!"""
+    #Debug log
+    #test 1: delete points as used - only lets one direction of edges get added.
 
+    points = pointsOrig[:]
     edges = []
     for start in points:
         for end in points:
@@ -211,6 +219,7 @@ def edge_tester(points, image, circle):
                 else:
                     if val:
                         edges.append([points.index(start), points.index(end)])
+    #    points.remove(start)
     return edges
 
 def edges_from_list(edges, graph, points):

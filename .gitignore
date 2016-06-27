@@ -1,13 +1,17 @@
-#Ignore image files
+#Ignore image and pdf files
 /*.png
 /*.jpg
 /*.tiff
+/*.pdf
 
 #Exclude Reference files and misc files
 /RefCode
 /Misc
 /Icons
 /__pycache__
+
+#Exclude cache files
+/*.pyc
 
 #Exceptions to exclusions
 !/Testing/*.png

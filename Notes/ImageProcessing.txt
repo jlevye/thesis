@@ -1,0 +1,30 @@
+Notes for creating leaf traces in GIMP.
+Requires GIMP plug-in "gimp-ace2-0.6.7".
+
+From plain scans:
+1. Crop image as close as possible to bounds of leaf.
+2. (Optional) Adjust contrast and brightness.
+3. Export image as .tif file; name = label from leaf image. (Code or species name.) Save in "Images" folder of parent directory.
+
+With a cropped leaf image:
+1. Create a duplicate layer. Protect and hide the original image. Name new layer "Trace".
+3. Desaturate image.
+3. Using "Adaptive Contrast" tool (Filters -> Colors -> Adaptive Contrast...).
+    a. Strength, brightness, iterations should be default.
+    b. Detail size = 5, Smoothing = 75, any method that uses "+correctdark" works. Use discretion. Goal = even background with distinct vein lines.
+    c. (Optional): Use Color -> Auto -> White Balance to convert gray background to white.
+4. Use "Threshold" tool to convert gray-scale to binary image. Light should cut off right where gray background is still registered as white. Use best judgement.
+5. Make background of trace transparent: "Layer -> Color to Alpha..."
+6. Set trace color to a similar level of luminosity as the pink image. Select all the black, and then use fill tool and chose a comfortable gray. You should now see a gray trace over the pink image.
+6. Create a 3rd layer, transparent background, on top. Label it "Points".
+7. Move systematically around image, correcting errors in the trace and marking points.
+8. When finished, delete the layer with the image, and use "Export Layers" plug-in to save each layer. 
+
+
+ImageJ functions to get the center locations of a image of points:
+open("/home/jen/Desktop/dots.png");
+run("8-bit");
+run("Analyze Particles...", "display");
+run("Set Measurements...", "centroid redirect=None decimal=3");
+saveAs("Results", "/home/jen/Desktop/testpoints.csv");
+close();
