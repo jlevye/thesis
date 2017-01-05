@@ -58,4 +58,4 @@ if __name__ == "__main__":
     print("Width calc time: {}".format(elapsed))
 
     # g.save("lescacrop.xml.gz")
-    gt.graph_draw(g, pos = g.vp.coord, vertex_text = g.vertex_index, edge_pen_width = g.ep.width)
+    gt.graph_draw(g, pos = g.vp.coord, vertex_text = g.vertex_index, edge_pen_width = g.ep.widis hth)

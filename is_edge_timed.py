@@ -11,9 +11,9 @@ from PIL import Image
 import graph_scripts as gs
 
 #Set up testing values
-imname = "Testing/LescaThresholdCrop.png"
-pointsname = "Testing/LescaPointsCrop.csv"
-source = 32
+imname = "/home/jen/Documents/School/GradSchool/Thesis/Images/Examples/Traces/Spoke1px.png"
+pointsname = "/home/jen/Documents/School/GradSchool/Thesis/Images/Examples/Points/Spoke1px.csv"
+source = 6
 
 image = gs.read_image(imname)
 points = gs.read_points(pointsname)
@@ -28,8 +28,8 @@ gs.add_all_vertices(g, points, image, dim, disp)
 
 cirDict = gs.make_all_circles(g, image)
 im = image
-a = points[34]
-b = points[36]
+a = points[0]
+b = points[1]
 thresh = 1
 
 start = timeit.default_timer()
@@ -77,38 +77,118 @@ endzone = gs.full_circle(b, gs.biggest_circle(b,im), im.shape)
 
 setup_ending = timeit.default_timer()
 
+##Revising everything in actual calculation portion of this function to try to increment more accurately
 h = -1 if a[0] > b[0] else 1 #Move left or right
 v = -1 if a[1] > b[1] else 1 #Move up or down
 
 end = a
 stop = 0
-
 count = 0
-all_pre_main_loop = timeit.default_timer()
 
 while stop == 0:
     count += 1
     #Have we hit b? Have we hit an edge?
-    if end[0] == b[0] or end[0] == width: h = 0
-    if end[1] == b[1] or end[1] == height: v = 0
+    if end[0] == b[0] or end[0] == width:
+        h = 0
+    else:
+        continue
+
+    if end[1] == b[1] or end[1] == height:
+        v = 0
+    else:
+        continue
+
     if [h,v] == [0,0]:
         stop = 1
+    else:
+        continue
 
     testX = end[0] + h
     testY = end[1] + v
 
-    #Test the possible directions we can move.
-    if h is not 0 and im[end[1]][testX] > thresh:
-        end[0] = testX
-        if end in p: stop=1
-    elif v is not 0 and im[testY][end[0]] > thresh:
-        end[1] = testY
-        if end in p: stop=1
-    elif im[testY][testX] > thresh:
-        end = [testX,testY]
-        if end in p: stop=1
-    else:
+    testA = [testX,testY]
+    testB = [end[0],testY]
+    testC = [testX, end[1]]
+    pointdist = [[testA, gs.distance(testA, b)], [testB, gs.distance(testB, b)], [testC, gs.distance(testC, b)]]
+    pointdist.sort(key = lambda x: x[1])
+    testpoints = [x[0] for  x in pointdist]
+
+    check = 0
+    for point in testpoints:
+        if point is not end and im[point[1]][point[0]] > thresh:
+            end = point
+            if end in p:
+                stop = 1
+            break
+        else:
+            check += 1
+    print(check)
+    if check == 3:
         stop = 1
+        
+#     #Test the possible directions we can move.
+#     if h is not 0 and im[end[1]][testX] > thresh:
+#         end[0] = testX
+#         if end in p: stop=1
+#     elif v is not 0 and im[testY][end[0]] > thresh:
+#         end[1] = testY
+#         if end in p: stop=1
+#     elif im[testY][testX] > thresh:
+#         end = [testX,testY]
+#         if end in p: stop=1
+#     else:
+#         stop = 1
+
+# #Alternative increment protocol - currently failing
+# end = a
+# stop = 0
+# count=0
+#
+# while stop == 0:
+#     count += 1
+#     rise = b[1] - end[1]
+#     run = b[0] - end[0]
+#
+#     if rise == 0:
+#         testY = end[1]
+#         testX = end[0] + 1 if b[0] > end[0] else end[0] - 1
+#     elif run == 0:
+#         testY = end[1] + 1 if b[1] > end[1] else end[1] - 1
+#         testX = end[0]
+#     else:
+#         slope = rise/run
+#         direction = gs.octant(end, b)
+#         p = gs.line_inc(end, direction, slope)
+#         testX = p[0]
+#         testY = p[1]
+#
+#     #Have we hit b?
+#     if [testX,testY] == b:
+#         end = [testX,testY]
+#         stop = 1
+#
+#     #Have we hit an edge? If so, go back! If we hit a corner or we didn't move, end.
+#     if testX == 0 or testX == width:
+#         testX = end[0]
+#
+#     if testY == 0 or testY == height:
+#         testX = end[1]
+#
+#     if [testX,testY] == end:
+#         stop = 1
+#
+#     #Test things:
+#     if im[testY][testX] > thresh:
+#         end = [testX,testY]
+#         if end in p: stop = 1
+#     elif testX is not end[0] and im[end[1]][testX] > thresh:
+#         end[0] = testX
+#         if end in p: stop = 1
+#     elif testY is not end[1] and im[testY][end[0]] > thresh:
+#         end[1] = testY
+#         if end in p: stop = 1
+#     else:
+#         stop = 1
 
 finished_loop = timeit.default_timer()
 

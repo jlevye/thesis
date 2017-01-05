@@ -2,20 +2,24 @@ import graph_scripts as gs
 import heapq
 
 def edge_tester2(points, image, circle, N, pct = False):
-    if len(points) < 10: N = len(points)
-    if pct:
-        N = round(N/100*len(points))
+    if len(points) < 10:
+        N = len(points)
+    else:
+        if pct:
+            N = round((N/100)*len(points))
 
     distances =  [[gs.distance(x, y) for x in points] for y in points]
     #used = []
     edges = []
 
     for start in points:
-        index = points.index(start)
-        row = distances[index]
-        mins = heapq.nsmallest(N,row)
-
-        neighbors = [points[row.index(x)] for x in mins]
+        if N != len(points):
+            index = points.index(start)
+            row = distances[index]
+            mins = heapq.nsmallest(N,row)
+            neighbors = [points[row.index(x)] for x in mins]
+        else: neighbors = points
+        
         for end in neighbors:
             if start == end:
                 continue

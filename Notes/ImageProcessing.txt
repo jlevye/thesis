@@ -18,7 +18,7 @@ With a cropped leaf image:
 6. Set trace color to a similar level of luminosity as the pink image. Select all the black, and then use fill tool and chose a comfortable gray. You should now see a gray trace over the pink image.
 6. Create a 3rd layer, transparent background, on top. Label it "Points".
 7. Move systematically around image, correcting errors in the trace and marking points.
-8. When finished, delete the layer with the image, and use "Export Layers" plug-in to save each layer. 
+8. When finished, delete the layer with the image, and use "Export Layers" plug-in to save each layer.
 
 
 ImageJ functions to get the center locations of a image of points:
@@ -28,3 +28,11 @@ run("Analyze Particles...", "display");
 run("Set Measurements...", "centroid redirect=None decimal=3");
 saveAs("Results", "/home/jen/Desktop/testpoints.csv");
 close();
+
+
+Suggestions from Max Feldman at GRC
+- Noah Falger (bioinformatics director at Danforth Center)
+First or second derivative filters
+
+- Gradient descent or resistance landscape algorithms for edge connectivity
+- Phase congruency algorithms
