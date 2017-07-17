@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-A method for converting a CSV file of data from ImageJ ROIs (with possible conversion to ImageJ plugin) into a graph object.
+A method for converting a CSV file of data from ImageJ - exported as a CSV using ImageJDataExport.py.
 """
 #Module import
 import pandas as pd
@@ -10,7 +10,7 @@ import sys
 import math
 import graph_tool.all as gt
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 #Class definitions
 class Edge():
@@ -50,36 +50,38 @@ def open_check_csv():
     data = pd.read_csv(file_path)
     names = list(data)
 
-    required = ["BX","BY","Width","Height","Angle"]
-    extra = ["Length","LWidth"]
+    #Option one
+    option1 = ["X","Y","Angle","Width","Height","LineWidth","Length"]
+    #Option two
+    option2 = ["x1","x2","y1","y2","Width","Length"]
 
-    if not all([name in names for name in required]):
-        print("Needs angle and bounding box measurement output.")
-        return
-    elif all([name in names for name in extra]):
-        keep = required + extra
-        data = data[keep]
+    if all([name in names for name in option1]):
+        data = boundbox_to_xy(data[opton1])
+        return data
+    else if all([name in names for name on option2])
+        data = data[option2]
         return data
     else:
-        data = data[required]
-        return data
+        print("Please use data exported using ImageJDataExport.py")
+        return
 
+#If using output from measurements rather than straight xy endpoints
 def boundbox_to_xy(df):
     #Note, edits df in place!
 
     df['case'] = np.where(np.logical_or(df['Angle'] >= 90, np.logical_and(np.greater(df['Angle'],-90),np.less(df['Angle'],0))), 1,2)
 
-    df['x1'] = df['BX']
-    df['x2'] = df['BX'] + df['Width']
-    df['y1'] = np.where(df['case']==1, df['BY'],df['BY'] + df['Height'])
-    df['y2'] = np.where(df['case']==2, df['BY'],df['BY'] + df['Height'])
+    df['x1'] = df['X']
+    df['x2'] = df['X'] + df['Width']
+    df['y1'] = np.where(df['case']==1, df['Y'],df['Y'] + df['Height'])
+    df['y2'] = np.where(df['case']==2, df['Y'],df['Y'] + df['Height'])
 
     #make preliminary/initial IDs
     df['id1'] = [i for i in range(len(df))]
     df['id2'] = [i for i in range(len(df), 2*len(df))]
 
     #Drop extra columns
-    to_drop = ["BX","BY","Height","Width","Angle"]
+    to_drop = ["X","Y","Height","Width","Angle"]
     df.drop(to_drop, axis = 1, inplace = True)
 
     return
@@ -115,8 +117,8 @@ def make_graph(vertices, edges):
         u2 = g.vertex(v2.graph_index)
 
         new_e = g.add_edge(u1, u2)
-        new_e.length = e.length
-        new_e.width = e.width
+        g.ep.length[new_e] = e.length
+        g.ep.width[new_e] = e.width
 
     return g
 
@@ -134,9 +136,6 @@ if __name__ == "__main__":
     #Load in dataset of line segment information
     segments = open_check_csv()
 
-    #Bounding box to x,y coordinate pairs
-    boundbox_to_xy(segments)
-
     #Create edge objects out of each row in the data frame & point objects out of each possible endpoint
     edges = []
     vertices = []
@@ -147,8 +146,8 @@ if __name__ == "__main__":
         else:
             new_edge.length = math.sqrt((row['x1'] - row['x2'])**2 + (row['y1']-row['y2'])**2)
 
-        if 'LWidth' in list(segments):
-            new_edge.width = row['LWidth']
+        if 'LineWidth' in list(segments):
+            new_edge.width = row['LineWidth']
 
         edges.append(new_edge)
         vertices = vertices + [Point(row['x1'],row['y1'], row['id1']), Point(row['x2'],row['y2'],row['id2'])]
@@ -169,3 +168,9 @@ if __name__ == "__main__":
             v.keep = False
 
     g = make_graph(vertices, edges)
+
+    display = messagebox.askyesno("Draw Graph","Would you like to display the graph?")
+    if display:
+        gt.graph_draw(g, pos = g.vp.pos, edge_pen_width=g.ep.width)
+
+    save_graph(g)

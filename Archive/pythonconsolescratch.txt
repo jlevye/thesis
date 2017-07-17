@@ -1,0 +1,90 @@
+jen@jen-Ubuntu:~$ python3
+Python 3.5.2+ (default, Sep 22 2016, 12:18:14)
+[GCC 6.2.0 20160927] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> g = NULL
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'NULL' is not defined
+>>> g = None
+>>> g == True
+False
+>>> if g:
+...     print("True")
+... else:
+...     print("false")
+...
+false
+>>> def tiny(a, b):
+...     return(a + b)
+...
+>>> class Adding:
+...     def __init__(self, a):
+...             self.a = a
+...             self.sum = tiny(a,b)
+...
+>>> b = 7
+>>> x = Adding(3)
+>>> x
+<__main__.Adding object at 0x7fd03142f550>
+>>> x.a
+3
+>>> x.sum
+10
+>>> y
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'y' is not defined
+>>> class Changing:
+...     def __init__(self):
+...             self.value = []
+...
+>>> x = Changing()
+>>> x
+<__main__.Changing object at 0x7fd03142f5c0>
+>>> x.value
+[]
+>>> x.value = 0
+>>> x.value
+0
+>>> list = [Changing(), Changing()]
+>>> list[1]
+<__main__.Changing object at 0x7fd030cb9908>
+>>> list[1].value
+[]
+>>> for thing in list:
+...     thing.value = 7
+...
+>>> list[1].value
+7
+>>> list1 = [1,2,3,4]
+>>> list2 = [5,6,8,0]
+>>> class Searching:
+...     def __init__(self, values):
+...             self.values = values
+...
+>>> biglist = [Searching(list1),Searching(list2)]
+>>> class Searching:
+...     def __init__(self, values, name):
+...             self.values=values
+...             self.name = name
+...
+>>> biglist = [Searching(list1,"foo"),Searching(list2,"bar")]
+>>> [thing.name for thing in biglist]
+['foo', 'bar']
+>>> [thing.values[0] for thing in biglist]
+[1, 5]
+>>> [thing.name for thing in biglist if 4 in thing]
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "<stdin>", line 1, in <listcomp>
+TypeError: argument of type 'Searching' is not iterable
+>>> [thing.name for thing in biglist if 4 in thing.values]
+['foo']
+>>> [n for n in thing.values for thing in biglist]
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+AttributeError: 'Changing' object has no attribute 'values'
+>>> [n for thing in biglist for n in thing.values]
+[1, 2, 3, 4, 5, 6, 8, 0]
+>>>
