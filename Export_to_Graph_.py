@@ -3,21 +3,76 @@ import string
 from ij import IJ
 from ij.plugin.frame import RoiManager
 
+#grab the default path, just in case
+path = os.getcwd()
+
+#Assumes that export_helper is found in the correct jar/libs folder
+from export_helper import *
+
 #Get the current image & the filename to save data as
 imp = IJ.getImage()
 filename = imp.title
 im_name = filename.split(".")[0]
-path = os.getcwd()
 
-#Get the overlay for the current image
+#If there's an overlay, grab it; if not, make it
+
+#Get the overlay for the current image, if there is one
+#Make the overlay if there isn't, so we can fill it from the ROI manager
 overlay = imp.getOverlay()
-rois = RoiManager(True)
+if overlay is None:
+	overlay = ij.gui.Overlay()
+	imp.setOverlay(overlay)
 
-#Make sure that any current ROIs have been added to the overlay we'll work with
+#Get the ROI manager and if it has things in it, add them to the overlay
+rois = getRoiManager()
 if rois.getCount() > 0: 
 	for roi in rois:
 		overlay.add(roi)
 
+#Process with corrections for intersection
+rangeEnd = overlay.size()
+lines = []
+
+for index in range(rangeEnd):
+	roi = overlay.get(index)
+	if roi.isLine():
+		s = [roi.x1, roi.y1]
+		t = [roi.x2, roi.y2]
+		length = roi.getLength()
+		width = roi.getStrokeWidth()
+		newLine = LineSegment(s,t)
+		newLine.length = length
+		newLine.width = width
+		lines.append(newLine)
+		m = slope(s, t)
+		b = intercept(s, m)
+
+fullSegments = []
+
+for line in lines:
+	crosses = [l for l in lines if l is not line]
+	newSegments = findSplits(line, crosses, thresh)
+	for seg in newSegments:
+		if seg.length > min_length:
+			fullSegments.append(seg)
+
+print len(fullSegments)
+
+newLayer = ij.gui.Overlay()
+
+for line in fullSegments:
+	toDraw = ij.gui.Line(line.s[0],line.s[1],line.t[0],line.t[1])
+	toDraw.setStrokeWidth(line.width)
+	toDraw.setStrokeColor(Color(0,255,0))
+	newLayer.add(toDraw)
+
+imp.setOverlay(newLayer)
+newLayer.setLabelColor(Color(0,0,0))
+newLayer.drawLabels(True)
+imp.updateImage()
+
+#So as to not have to re-write script later, change variable names
+overlay = newLayer
 
 #From each ROI get information needed, set up to work with analysis script
 x1 = []

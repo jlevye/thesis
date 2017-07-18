@@ -10,7 +10,9 @@ Leveraging existing methods for tracing leaf veins and measuring vein density, t
 
 ###Data Export
 
-The data export protocol requires an image (in any format) that has been traced into an overlay in using the image processing program [ImageJ](https://imagej.net/Welcome). Scripts written to interface with ImageJ API rely on the Jython framework and are thus wrtten in Python2. They can be installed as plug-ins by placing them in `ImageJ.app/scripts/` or `ImageJ.app/plugins/Scripts`.
+The data export protocol requires an image (in any format) that has been traced into an overlay in using the image processing program [ImageJ](https://imagej.net/Welcome). Scripts written to interface with ImageJ API rely on the Jython framework and are thus wrtten in Python2.
+
+The main plugin script (`Export_for_graph_.py`) can be added to the plugins menu by placing it in `ImageJ.app/plugins/Scripts`; the module file containing classes and functions (`export_helper.py`) should be placed in `ImageJ.apps/jars/Lib`, which may need to be created if it does not exist.
 
 The data export process outputs a CSV file including every line segment ROI produced in tracing.
 
