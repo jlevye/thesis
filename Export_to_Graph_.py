@@ -1,20 +1,21 @@
-import os, csv
+import os, csv, sys
 import string
 from ij import IJ
 from ij.plugin.frame import RoiManager
+from ij.gui import GenericDialog
 
 #grab the default path, just in case
 path = os.getcwd()
 
 #Assumes that export_helper is found in the correct jar/libs folder
+#just in case:
+sys.path.append("/home/jen/Documents/School/GradSchool/Thesis/Code")
 from export_helper import *
 
 #Get the current image & the filename to save data as
 imp = IJ.getImage()
 filename = imp.title
 im_name = filename.split(".")[0]
-
-#If there's an overlay, grab it; if not, make it
 
 #Get the overlay for the current image, if there is one
 #Make the overlay if there isn't, so we can fill it from the ROI manager
@@ -24,10 +25,16 @@ if overlay is None:
 	imp.setOverlay(overlay)
 
 #Get the ROI manager and if it has things in it, add them to the overlay
-rois = getRoiManager()
-if rois.getCount() > 0: 
+ROIM = RoiManager()
+if ROIM.getCount() > 0:
+	rois = ROIM.getRoisAsArray() 
 	for roi in rois:
 		overlay.add(roi)
+
+#Setting up parameters
+
+#@int(label="Segment length cut-off",value=0) min_length 
+#@int(label="Intersection threshold",value=1) thresh 
 
 #Process with corrections for intersection
 rangeEnd = overlay.size()
@@ -56,7 +63,7 @@ for line in lines:
 		if seg.length > min_length:
 			fullSegments.append(seg)
 
-print len(fullSegments)
+#print len(fullSegments)
 
 newLayer = ij.gui.Overlay()
 
@@ -71,55 +78,71 @@ newLayer.setLabelColor(Color(0,0,0))
 newLayer.drawLabels(True)
 imp.updateImage()
 
-#So as to not have to re-write script later, change variable names
-overlay = newLayer
+confirm = GenericDialog("Confirmation")
+confirm.addMessage("Save revised ROIs and export data?")
+confirm.showDialog()
 
-#From each ROI get information needed, set up to work with analysis script
-x1 = []
-x2 = []
-y1 = []
-y2 = []
-width = []
-length = []
+if confirm.wasCanceled():
+	confirmOK = False
+elif confirm.wasOKed():
+	confirmOK = True
 
-for i in range(overlay.size()):
-	roi = overlay.get(i)
-	if roi.isLine():
-		width.append(roi.getStrokeWidth()
-		length.append(roi.getLength())
-		x1.append(roi.x1)
-		x2.append(roi.x2)
-		y1.append(roi.y1)
-		y2.append(roi.y2)
+#Only finish if OK is confirmed
+if confirmOK:
+	#So as to not have to re-write script later, change variable names
+	overlay = newLayer
+
+	#From each ROI get information needed, set up to work with analysis script
+	x1 = []
+	x2 = []
+	y1 = []
+	y2 = []
+	width = []
+	length = []
+
+	for i in range(overlay.size()):
+		roi = overlay.get(i)
+		if roi.isLine():
+			width.append(roi.getStrokeWidth())
+			length.append(roi.getLength())
+			x1.append(roi.x1)
+			x2.append(roi.x2)
+			y1.append(roi.y1)
+			y2.append(roi.y2)
 	
 		
-##Get all the measurements etc needed
-#m = overlay.measure(imp)
+	##Get all the measurements etc needed
+	#m = overlay.measure(imp)
 
-#array = overlay.toArray()
-#line_width = [roi.getStrokeWidth() for roi in array]
+	#array = overlay.toArray()
+	#line_width = [roi.getStrokeWidth() for roi in array]
 
-#angle = m.getColumn(m.getColumnIndex("Angle"))
+	#angle = m.getColumn(m.getColumnIndex("Angle"))
 
-#x = m.getColumn(m.getColumnIndex("BX"))
-#y = m.getColumn(m.getColumnIndex("BY"))
-#width = m.getColumn(m.getColumnIndex("Width"))
-#height = m.getColumn(m.getColumnIndex("Height"))
-#length = m.getColumn(m.getColumnIndex("Length"))
+	#x = m.getColumn(m.getColumnIndex("BX"))
+	#y = m.getColumn(m.getColumnIndex("BY"))
+	#width = m.getColumn(m.getColumnIndex("Width"))
+	#height = m.getColumn(m.getColumnIndex("Height"))
+	#length = m.getColumn(m.getColumnIndex("Length"))
 
-#Write to file
-dataFileName = string.join([im_name, "csv"], ".")
-fullWriteFile = os.path.join(path, dataFileName)
+	#Write to file
+	dataFileName = string.join([im_name, "csv"], ".")
+	fullWriteFile = os.path.join(path, dataFileName)
 
-f = open(fullWriteFile, "wb")
-writer = csv.writer(f)
-#names = ["X","Y","Angle","Width","Height","LineWidth","Length"]
-names = ["x1","x2","y1","y2","Width","Length"]
-writer.writerow(names)
+	f = open(fullWriteFile, "wb")
+	writer = csv.writer(f)
+	#names = ["X","Y","Angle","Width","Height","LineWidth","Length"]
+	names = ["x1","x2","y1","y2","Width","Length"]
+	writer.writerow(names)
 
-for  i in range(len(x)):
-	#row = [x[i], y[i], angle[i], width[i], height[i], line_width[i],length[i]]
-	row = [x1[i], x2[i], y1[i], y2[i], width[i], length[i]]
-	writer.writerow(row)
+	for  i in range(len(x)):
+		#row = [x[i], y[i], angle[i], width[i], height[i], line_width[i],length[i]]
+		row = [x1[i], x2[i], y1[i], y2[i], width[i], length[i]]
+		writer.writerow(row)
 
-f.close()
+	f.close()
+else:
+	#Put the original overlay back
+	imp.setOverlay(overlay)
+	imp.updateImage()
+	

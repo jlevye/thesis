@@ -1,8 +1,3 @@
-#Setting up parameters
-
-#@int(label="Segment length cut-off",value=0) min_length 
-#@int(label="Intersection threshold",value=1) thresh 
-
 import os, csv
 import string
 import math
