@@ -98,8 +98,8 @@ def make_graph(vertices, edges):
     #Edge properties
     g.ep.length = g.new_edge_property("float")
     g.ep.width = g.new_edge_property("int")
-    g.ep.res = g.new_edge_property("float")
-    g.ep.vol = g.new_edge_property("float")
+	g.ep.res = g.new_edge_property("float")
+	g.ep.vol = g.new_edge_property("float")
 
     #Make vertices
     for v in vertices:
@@ -124,9 +124,9 @@ def make_graph(vertices, edges):
             new_e = g.add_edge(u1, u2)
             g.ep.length[new_e] = e.length
             g.ep.width[new_e] = e.width
-            #TO DO: Add function that allows user to choose the formula used here! (Ie, make the resistance calculation a function depending on user input
-            g.ep.res[new_e] = e.length/e.width**4
-            g.ep.vol[new_e] = e.length*e.width**2
+			#TO DO: Add function that allows user to choose the formula used here! (Ie, make the resistance calculation a function depending on user input
+			g.ep.res[new_e] = 1/e.width^4
+			g.ep.vol[new_e] = e.width^2*e.length
 
     return g
 

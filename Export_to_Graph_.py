@@ -9,7 +9,7 @@ path = os.getcwd()
 
 #Assumes that export_helper is found in the correct jar/libs folder
 #just in case:
-sys.path.append("/home/jen/Documents/School/GradSchool/Thesis/Code")
+#sys.path.append("/home/jen/Documents/School/GradSchool/Thesis/Code")
 from export_helper import *
 
 #Get the current image & the filename to save data as
@@ -135,7 +135,7 @@ if confirmOK:
 	names = ["x1","x2","y1","y2","Width","Length"]
 	writer.writerow(names)
 
-	for  i in range(len(x)):
+	for  i in range(len(x1)):
 		#row = [x[i], y[i], angle[i], width[i], height[i], line_width[i],length[i]]
 		row = [x1[i], x2[i], y1[i], y2[i], width[i], length[i]]
 		writer.writerow(row)

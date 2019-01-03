@@ -20,13 +20,19 @@ def distance(a,b):
 	
 #Find the slope of a line defined by two x,y points
 def slope(s,t):
-    m = float((t[1]-s[1]))/float((t[0]-s[0]))
-    return m
+	if t[0]-s[0] == 0:
+		m = None
+	else:
+		m = float((t[1]-s[1]))/float((t[0]-s[0]))
+	return m
 
 #p is (x,y) coordinate, m is a slope
 def intercept(p, m):
-    b = -1*m*p[0] + p[1]
-    return b
+	if m is not None:
+		b = -1*m*p[0] + p[1]
+	else:
+		b = None
+	return b
 
 #a and b are line segment objects
 def intersection(a, b, fuzz=0):
@@ -36,23 +42,41 @@ def intersection(a, b, fuzz=0):
 	b1 = intercept(a.s, m1)
 	b2 = intercept(b.s, m2)
 
+	
     #Don't try to divide by 0 if lines are parallel
 	if m1 == m2:
 		return False
+	#Check for vertical lines: 
+	elif any([i is None for i in [m1,m2,b1,b2]]):
+		if m1 is None:
+			x = a.s[0]
+			y = m2*x + b2
+		elif m2 is None:
+			x = b.s[0]
+			y = m1*x + b1
 	else:    
 		x = (b2 - b1)/(m1 - m2)
 		y = m1*x + b1
 
-    #Define the bounds
-	Xs = sorted([a.s[0], a.t[0], b.s[0], b.t[0]])
-	Ys = sorted([a.s[1], a.t[1], b.s[1], b.t[1]])
+    #Define the bounds, xs and ys for redundancy
+	X1s = sorted([a.s[0], a.t[0]])
+	X2s = sorted([b.s[0], b.t[0]])
 
-	lowerX = Xs[1] - fuzz
-	upperX = Xs[2] + fuzz
-	lowerY = Ys[1] - fuzz
-	upperY = Ys[2] + fuzz
+	lowerX1 = X1s[0] - fuzz
+	upperX1 = X1s[1] + fuzz
+	lowerX2 = X2s[0] - fuzz
+	upperX2 = X2s[1] + fuzz
 
-	if lowerX <= x <= upperX and lowerY <= y <= upperY:
+	Y1s = sorted([a.s[1], a.t[1]])
+	Y2s = sorted([b.s[1], b.t[1]])
+
+	lowerY1 = Y1s[0] - fuzz
+	upperY1 = Y1s[1] + fuzz
+	lowerY2 = Y2s[0] - fuzz
+	upperY2 = Y2s[1] + fuzz
+
+
+	if all([lowerX1 <= x <= upperX1,lowerX2 <= x <= upperX2,lowerY1 <= y <= upperY1,lowerY2 <= y <= upperY2]):
 		return [x,y]
 	else:
 		return False

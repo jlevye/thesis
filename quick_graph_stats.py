@@ -4,10 +4,10 @@ import os
 import statistics as stats
 import graph_tool.all as gt
 
-os.chdir("/home/jen/Documents/School/GradSchool/Thesis/Images/")
+os.chdir("/home/jen")
 
-g_link = gt.load_graph("Examples/ToyLinked.xml.gz")
-g_bran = gt.load_graph("Examples/ToyBranching.xml.gz")
+g_link = gt.load_graph("linky.xml.gz")
+g_bran = gt.load_graph("branchy.xml.gz")
 
 #Misc Stats
 link_deg_avg, link_deg_std = gt.vertex_average(g_link, deg="total")
