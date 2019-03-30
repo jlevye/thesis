@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-A method for converting a CSV file of data from ImageJ - exported as a CSV using ImageJDataExport.py. This version is for a batch process.
+For converting files, either CSV (currently implemented) or svg (TBA) into graph data structures.
 """
 #Module import
 import pandas as pd
@@ -132,16 +132,16 @@ def boundbox_to_xy(df):
 
     return
 
-def get_edge_options():
-    type = easygui.choicebox(choices = (""))
-
-#Weighting diameter to approximate resistance - multiple options
-def edge_weight(d, l, n = 1, type = "fixed_n",power = 0.6):
-    if type == "fixed_n":
+#Calculating approximate edge resistance - multiple options
+def edge_resist(d, l, n = 1, type = "const_n",alpha = 0.6, p = 1):
+    if type == "const_n":
         #Default
-    elif type == "":
-    elif type == "power":
+    elif type == "const_d":
+    elif type == "taper":
 
+#Getting edges and vertices from a
+def makeEV(df):
+    return
 
 def make_graph(vertices, edges):
     #Assumes GraphTool rather than GraphML or other light-weight option; add alternative for flexibility
