@@ -99,8 +99,8 @@ class MainWIndow(Tk):
         elif PARAMS["InFile"].value is not None:
             ## TODO: Read in file
             ## TODO: process single graph and save
-            ## TODO: Propmpt to display
-            ## TODO: Propmpt for statistics   
+            ## TODO: Propmpt to display & designate source
+            ## TODO: Propmpt for statistics
         else:
             print("No file or folder selected. Please open a file to process and try again.")
 

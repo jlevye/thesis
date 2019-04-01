@@ -5,6 +5,7 @@ Only the methods of Roi_to_graph, designed for use with GUI
 #Module import
 import pandas as pd
 import numpy as np
+import scipy
 import csv
 import sys
 import math
@@ -12,6 +13,7 @@ import os
 import graph_tool.all as gt
 import tkinter as tk
 import statistics as stats
+from random import shuffle
 from tkinter import filedialog, messagebox
 
 #Class definitions
@@ -102,11 +104,13 @@ def boundbox_to_xy(df):
 
 #TODO
 #Calculating approximate edge resistance - multiple options
-def edge_resist(d, l, n = 1, type = "const_n",alpha = 0.6, p = 1):
-    if type == "const_n":
+def edge_resist(Diam, l, d = 0, n = 1, type = "const_n",alpha = 0.6, p = 1):
+    area = 
+
+    if type == "const_n": #How big can n circles be inside size Diam*p?
         #Default
-    elif type == "const_d":
-    elif type == "taper":
+    elif type == "const_d": #How many circles of size d it inside Diam*p?
+    elif type == "taper": #How many circles of Diam^alpha fit in Diam*p?
 
 #Getting edges and vertices from a dataframe
 def makeEV(df):
@@ -192,6 +196,19 @@ def displayGraph(g):
     gt.graph_draw(g, pos = g.vp.pos, edge_pen_width=g.ep.width)
     return
 
+#Opens interactive window for selecting "source" node of graph. Source required for max flow calculations.
+#Returns graph_tool vertex that was selected
+def setSource(g):
+    coord, filter = gt.interactive_window(g, pos = g.vp.pos)
+
+    if sum(filter.get_array()) != 1:
+        print("Select exactly one source node.")
+        return
+    else:
+        index = np.where(filter.get_array()==1)[0][0]
+        source = g.vertex(index)
+        return source
+
 ## Graph Statistics/Analytics
 def efficiency(graph):
     all_shortest_paths = gt.shortest_distance(graph)
@@ -243,6 +260,7 @@ def mean_btwn(graph, mode = "edge"):
 #Mode is one of "random", "weighted", "betweenness"
 #Weight is the graph EdgePropertyMap to sort by
 #Ascending is low to high value (default)
+#Root is a vertex, largest component set to root
 def fault_tolerance(graph, outfile, mode = "random", weight = None, ascending=True):
     #Create a "filter" property to use with graph
     filter = graph.new_edge_property("bool")
@@ -278,15 +296,53 @@ def fault_tolerance(graph, outfile, mode = "random", weight = None, ascending=Tr
     for i in index:
         #Store prev. iteration data
         n_removed.append(counter)
-        largest.append(component_size(g))
-        cost.append(cost_calc(g))
-        perf.append(performance(g))
-        eff.append(efficiency(g))
+        largest.append(component_size(graph))
+        cost.append(cost_calc(graph))
+        perf.append(performance(graph))
+        eff.append(efficiency(graph))
 
         #Update everything
         counter += 1
-        g.ep.filter.get_array()[i,] = 0
-        g.set_edge_filter(g.ep.filter)
+        filter.get_array()[i,] = 0
+        graph.set_edge_filter(filter)
 
     data = pd.DataFrame({"Removed" : n_removed, "LargestConnected" : largest, "Cost": cost, "Performance" : perf, "Efficiency" : eff})
     data.to_csv(outfile)
+
+#Variant fault tolerence test - N runs of edge removal until component connected to source is chosen proportion of orig size
+#Propmpts for a source node if none is given
+def iterateFault(graph, source = None, N = 100, prop = 0.5):
+    if source is None or source.is_valid() is False:
+        source = setSource(graph)
+    total = sum(gt.label_out_component(graph, source).a[:])
+    stop = prop*total
+
+    filter = graph.new_edge_property("bool")
+    index = list(range(filter.get_array().size -1))
+    results = [0]*N
+    for i in range(N):
+        filter.get_array()[:] = 1
+        shuffle(index)
+        count = 0
+        for edge in index:
+            filter.get_array()[edge,] = 0
+            graph.set_edge_filter(filter)
+            count += 1
+            if sum(gt.label_out_component(graph, source).a[:]) < stop:
+                break
+        results[i] = count
+    return results
+
+#Returns a list, sorted largest to smallest, of real non-zero eigenvalues of the graph Laplacian
+def spectra(graph, weight = None):
+    l = gt.laplacian(graph, weight = weight)
+    eigenval, eigenvec = scipy.sparse.linalg.eigs(l)
+    real_eigen = [i.real for i in eigenval if i.imag == 0]
+    return sorted(real_eigen, reverse = True)
+
+
+def cheegerApprox(graph, weight = None):
+        eigenval = spectra(graph, weight)
+        sse = eigenval[-2]
+        cheeger = math.sqrt(2*sse)
+        return cheeger
