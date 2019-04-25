@@ -70,7 +70,7 @@ def check_csv(file_path):
     option2 = ["x1","x2","y1","y2","Width","Length"]
 
     if all([name in names for name in option1]):
-        data = boundbox_to_xy(data[opton1])
+        data = boundbox_to_xy(data[option1])
         return data
     elif all([name in names for name in option2]):
         data = data[option2]
@@ -100,20 +100,33 @@ def boundbox_to_xy(df):
     to_drop = ["X","Y","Height","Width","Angle"]
     df.drop(to_drop, axis = 1, inplace = True)
 
-    return
+    return df
 
 #TODO
 #Calculating approximate edge resistance - multiple options
 def edge_resist(Diam, l, d = 0, n = 1, type = "const_n",alpha = 0.6, p = 1):
-    area = 
+    area = (math.pi*(Diam/2)**2)*p
 
+    #Correctly calculate d (hydralically weighted mean diameter)
     if type == "const_n": #How big can n circles be inside size Diam*p?
-        #Default
+        small_area = area/n
+        d = 2*math.sqrt(small_area/math.pi)
     elif type == "const_d": #How many circles of size d it inside Diam*p?
+        small_area = math.pi*(d/2)**2
+        n = floor(area/small_area)
     elif type == "taper": #How many circles of Diam^alpha fit in Diam*p?
+        d = Diam**alpha
+        small_area = math.pi*(d/2)**2
+        n = floor(area/small_area)
+    else:
+        print("Incorrect mode.")
+        return
+
+    R = l/(n*d**4)
+    return R
 
 #Getting edges and vertices from a dataframe
-def makeEV(df):
+def makeEV(segments):
     edges = []
     vertices = []
     for index, row in segments.iterrows():
@@ -144,6 +157,8 @@ def makeEV(df):
     for v in vertices:
         if v.id != v.alias:
             v.keep = False
+
+    return vertices, edges
 
 def make_graph(vertices, edges):
     #Assumes GraphTool rather than GraphML or other light-weight option; add alternative for flexibility
@@ -182,19 +197,57 @@ def make_graph(vertices, edges):
             g.ep.length[new_e] = e.length
             g.ep.width[new_e] = e.width
             ## TODO: Use function to calculate weight and volume
-            g.ep.res[new_e] = 1/e.width**4
+            g.ep.res[new_e] = e.length/e.width**4
             g.ep.vol[new_e] = e.width**2*e.length
     return g
 
-def save_graph(g, orig_file_path):
+#Includes option for printing metadata
+def save_graph(g, orig_file_path, metadata = None):
     csv_name = orig_file_path.split("/")[-1]
     graph_name = csv_name.split(".")[0] + ".xml.gz"
     g.save(graph_name)
+
+    if metadata:
+        filename = csv_name.split(".")[0]+".txt"
+        with open(filename, "w+") as f:
+            print(metadata, file=f)
     return
+
 
 def displayGraph(g):
     gt.graph_draw(g, pos = g.vp.pos, edge_pen_width=g.ep.width)
     return
+
+def parse_name(filepath):
+    filename = filepath.split("/")[-1]
+    graphname = filename.split(".")[:-1]
+    if len(graphname) > 1:
+        return ".".join(graphname)
+    else:
+        return graphname
+
+def parseHeader(path):
+    try:
+        data = pd.read_csv(path)
+        return list(data)
+    except pd.errors.ParserError:
+        print("Can't read file. Please select another.")
+        return
+
+#Appends a row to a csv file. Assumes file path has already been validated, double checks that row is correct.
+#Assumes the last line of the csv includes linebreak
+def appendRow(path, row):
+    if len(list(pd.read_csv(path))) != len(row):
+        print("Bad row or incorrect file. Please try again.")
+        return
+    else:
+        with open(path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
+        return
+
+def functionLookup():
+    lookup = {}
 
 #Opens interactive window for selecting "source" node of graph. Source required for max flow calculations.
 #Returns graph_tool vertex that was selected
@@ -210,8 +263,8 @@ def setSource(g):
         return source
 
 ## Graph Statistics/Analytics
-def efficiency(graph):
-    all_shortest_paths = gt.shortest_distance(graph)
+def efficiency(graph, weight = None):
+    all_shortest_paths = gt.shortest_distance(graph, weights = weight)
     N = graph.num_vertices()
     path_list = [x for vector in all_shortest_paths for x in vector]
     inverse_sum = sum([1/x if x > 0 else x for x in path_list])
@@ -221,25 +274,37 @@ def efficiency(graph):
         efficiency = np.nan
     return efficiency
 
-def cost_calc(graph):
+## TODO: Verify weighting option
+def cost_calc(graph, weight = None):
     orig_filter = graph.get_edge_filter()
-    n_orig = graph.num_edges()
-    mst = gt.min_spanning_tree(graph)
-    graph.set_edge_filter(mst)
-    try:
-        c = n_orig/graph.num_edges()
-    except ZeroDivisionError:
-        c = np.nan
-    g.set_edge_filter(orig_filter[0])
+    if weight is None:
+        n_orig = graph.num_edges()
+        mst = gt.min_spanning_tree(graph)
+        graph.set_edge_filter(mst)
+        try:
+            c = n_orig/graph.num_edges()
+        except ZeroDivisionError:
+            c = np.nan
+    else:
+        n_orig = sum(weight.get_array()[:])
+        mst = gt.min_splanning_tree(graph, weights = weight)
+        graph.set_edge_filter(mst)
+        n_new = sum(weight.get_array()[:])
+        try:
+            c = n_orig/n_new
+        except ZeroDivisionError:
+            c = np.nan
+    graph.set_edge_filter(orig_filter[0])
     return c
 
-def performance(graph):
+## TODO: Add second weighting option - MST should use cost, shortest paths should use resistance
+def performance(graph, weight = None):
     orig_filter = graph.get_edge_filter()
 
-    mst = gt.min_spanning_tree(graph)
-    g_shortest = [x for vector in gt.shortest_distance(graph) for x in vector]
+    mst = gt.min_spanning_tree(graph, weights =weight)
+    g_shortest = [x for vector in gt.shortest_distance(graph, weights = weight) for x in vector]
     graph.set_edge_filter(mst)
-    g_mst_shortest = [x for vector in gt.shortest_distance(graph) for x in vector]
+    g_mst_shortest = [x for vector in gt.shortest_distance(graph, weights = weight) for x in vector]
 
     try:
         p = stats.mean(g_shortest)/stats.mean(g_mst_shortest)
@@ -253,7 +318,11 @@ def component_size(graph):
     map = gt.label_largest_component(graph)
     return sum(map.a[:])
 
-def mean_btwn(graph, mode = "edge"):
+def mean_btwn(graph,weight = None, mode = "edge"):
+    vbtwn, ebtwn = gt.betweenness(graph, weight = weight)
+    mean = stats.mean(ebtwn.get_array()[:])
+    sd = stats.stdev(ebtwn.get_array()[:])
+    return mean, sd
 
 #Graph is a graph data structure
 #Outfile is the path to save the output (as a text CSV)
@@ -270,7 +339,7 @@ def fault_tolerance(graph, outfile, mode = "random", weight = None, ascending=Tr
     if mode == "random":
         index = list(range(filter.get_array().size -1))
         shuffle(index)
-    elif mode == "weighted"
+    elif mode == "weighted":
         if ascending:
             index = list(np.argsort(weight.get_array()))
         else:
