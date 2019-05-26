@@ -47,7 +47,7 @@ def performance(graph):
         p = stats.mean(g_shortest)/stats.mean(g_mst_shortest)
     except ZeroDivisionError:
         p = np.nan
-        
+
     graph.set_edge_filter(orig_filter[0])
     return p
 
@@ -104,6 +104,7 @@ for i in index:
 #Store data and stuff
 d = {"Removed" : n_removed, "LargestConnected" : largest, "Cost": cost, "Performance" : perf, "Efficiency" : eff}
 data_random = pd.DataFrame(d)
+data_random.to_csv("~/FTrandom.csv")
 
 #Filter based on weight; resetting storage vectors
 #reset edge filter
@@ -139,6 +140,7 @@ for i in weight_index:
 
 d = {"Removed" : n_removed, "LargestConnected" : largest, "Cost": cost, "Performance" : perf, "Efficiency" : eff}
 data_weight = pd.DataFrame(d)
+data_weight.to_csv("~/FTweight.csv")
 
 #Filter based on centrality
 #reset edge filter
@@ -174,3 +176,4 @@ for i in btwn_index:
 
 d = {"Removed" : n_removed, "LargestConnected" : largest, "Cost": cost, "Performance" : perf, "Efficiency" : eff}
 data_btwn = pd.DataFrame(d)
+data_btwn.to_csv("~/FTbtwn.csv")

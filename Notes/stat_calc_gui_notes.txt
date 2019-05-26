@@ -1,0 +1,54 @@
+Notes/Scratch for building a look-up table of functions.
+Built as part of stats pop-up class, where each function
+Will be in pairs of:
+
+"Name" : func
+
+Names will map to data file headers.
+
+"GraphID" :
+    - Get name, without extension, of current graph file
+"FilePath" :
+    - Get the current graph filepath
+"NVertices" :
+    - g.num_vertices()
+"AvgDegree" :
+    - gt.vertex_average(g, "total")
+"NEdges":
+     - g.num_edges()
+"TotalLength" :
+     - sum(g.ep.length.get_array()[:])
+"Cost" :
+    - cost_calc(g, weight)
+        Prompt for user to select edge weighting option
+"Efficiency" :
+    - efficiency(g, weight)
+        Prompt user to select edge weighting option
+"TransportPerformance" :
+    - performance(g, weight)
+        As above
+"LaPlacianSpectra" :
+    - spectra(g, weight)
+        as above
+"EdgeBetweennessMean" :
+    - mean_btwn(g, weight)[0]
+        as above
+"EdgeBetweennessSD" :
+    - mean_btwn(g, weight)[1]
+        as above - uses same weight as mean
+"CheegerLimit" :
+    - cheegerApprox(g, weight)
+"MinCut" :
+    - gt.min_cut(g, weight)
+
+names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","Cost","Efficiency","TransportPerformance","LaPlacianSpectra",
+    "EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
+req_weight = ["Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean", "CheegerLimit","MinCut"]
+
+
+* Create a single window with these options, dropdown menus for selection
+
+if name in req_weight:
+    #Create dropdown menu and variable to store it
+else:
+    #Just create empty label/line

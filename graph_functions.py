@@ -44,9 +44,9 @@ def vertex_distance_object(u, v):
     return dist
 
 #File I/O
-def get_csv_files():
-    open_directory = PARAMS["InFile"].value
-    file_names = [open_directory + "/" + file for file in os.listdir(open_directory) if file.endswith(("CSV","csv"))]
+def get_batch_files(open_directory):
+    csv_files = [open_directory + "/" + file for file in os.listdir(open_directory) if file.endswith(("CSV","csv"))]
+    svg_files = [open_directory + "/" + file for file in os.listdir(open_directory) if file.endswith(("SVG","svg"))]
 
     #Also set the save location: creates a folder called "Graph" in the parent of the CSV folder.
     parent = os.path.dirname(open_directory)
@@ -58,7 +58,7 @@ def get_csv_files():
     except FileExistsError:
         os.chdir("Graph")
 
-    return file_names
+    return csv_files, svg_files
 
 def check_csv(file_path):
     data = pd.read_csv(file_path)
@@ -81,6 +81,116 @@ def check_csv(file_path):
         print("Please use data exported using ImageJDataExport.py")
         return
 
+##Functions for splititng intersections/processing image files
+#s and t are tuples or lists x1,y1 and x2,y2
+def slope(s,t):
+    if t[0]-s[0] == 0:
+        m = None
+    else:
+        m = float((t[1]-s[1]))/float((t[0]-s[0]))
+    return m
+
+def distance(s,t):
+    d = math.sqrt((s[0]-t[0])**2 + (s[1]-t[1])**2)
+    return d
+
+#p is point, m is slope
+def intercept(p, m):
+    if m is not None:
+        b = -1*m*p[0] + p[1]
+    else:
+        b = None
+    return b
+
+#a and b are pairs of tuples = coordinate pairs (ie: [(x1,y1),(x2,y2)])
+def intersect(a, b, fuzz = 0):
+    m1 = slope(a[0], a[1])
+    m2 = slope(b[0], b[1])
+    b1 = intercept(a[0], m1)
+    b2 = intercept(b[0], m2)
+
+     #Don't try to divide by 0 if lines are parallel
+    if m1 == m2:
+        return False
+    #Check for vertical lines:
+    elif any([i is None for i in [m1,m2,b1,b2]]):
+        if m1 is None:
+            x = a[0][0]
+            y = m2*x + b2
+        elif m2 is None:
+            x = b[0][0]
+            y = m1*x + b1
+    else:
+        x = (b2 - b1)/(m1 - m2)
+        y = m1*x + b1
+
+    #Define the bounds, xs and ys for redundancy
+    X1s = sorted([a[0][0], a[1][0]])
+    X2s = sorted([b[0][0], b[1][0]])
+
+    lowerX1 = X1s[0] - fuzz
+    upperX1 = X1s[1] + fuzz
+    lowerX2 = X2s[0] - fuzz
+    upperX2 = X2s[1] + fuzz
+
+    Y1s = sorted([a[0][1], a[1][1]])
+    Y2s = sorted([b[0][1], b[1][1]])
+
+    lowerY1 = Y1s[0] - fuzz
+    upperY1 = Y1s[1] + fuzz
+    lowerY2 = Y2s[0] - fuzz
+    upperY2 = Y2s[1] + fuzz
+
+    if all([lowerX1 <= x <= upperX1,lowerX2 <= x <= upperX2,lowerY1 <= y <= upperY1,lowerY2 <= y <= upperY2]):
+        return [x,y]
+    else:
+        return False
+
+#a is a row in a dataframe, crosses are all the other rows
+#Eventually returns a list of line segments correctly indicating breaks in a
+#Uses 1/2 the width as the cut-off for intersections
+def findSplits(row, crosses, minimum=1):
+    width = row[4]
+    a = [[row[0],row[1]],[row[2],row[3]]]
+    ends = [a[0]]
+    fuzz = 0.5*width
+    for cross in crosses:
+        b = [[cross[0],cross[1]],[cross[2],cross[3]]]
+        p = intersect(a, b, fuzz)
+        if p:
+            ends.append(p)
+    ends.append(a[1])
+
+    ends.sort() #Sorts by the first element by default, so sorted by x value
+    segments = []
+
+    for i in range(len(ends)-1):
+        a = ends[i]
+        b = ends[i + 1]
+
+        l = distance(a,b)
+        if l >= minimum:
+            newLine = [a[0],a[1],b[0],b[1],width,l]
+            segments.append(newLine)
+
+    new_segs = pd.DataFrame(segments, columns = ["x1","y1","x2","y2","Width","Length"])
+    return new_segs
+
+def split_data(data, minimum=1):
+    segs = data.values.tolist()
+    new_data = pd.DataFrame(columns = ["x1","y1","x2","y2","Width","Length"])
+
+    if issnumeric(minimum):
+        minimum = float(minimum)
+    else:
+        minimum = min(segs["Length"])
+    for seg in segs:
+        crosses = [s for s in segs if s is not seg]
+        splits = findSplits(seg, crosses, minimum)
+        new_data = new_data.append(splits, ignore_index = True)
+
+    return new_data
+
 #If using output from measurements rather than straight xy endpoints
 def boundbox_to_xy(df):
     #Note, edits df in place!
@@ -99,10 +209,9 @@ def boundbox_to_xy(df):
     #Drop extra columns
     to_drop = ["X","Y","Height","Width","Angle"]
     df.drop(to_drop, axis = 1, inplace = True)
-
+    df.rename(columns={"LineWidth":"Width"},inplace = True)
     return df
 
-#TODO
 #Calculating approximate edge resistance - multiple options
 def edge_resist(Diam, l, d = 0, n = 1, type = "const_n",alpha = 0.6, p = 1):
     area = (math.pi*(Diam/2)**2)*p
@@ -126,7 +235,7 @@ def edge_resist(Diam, l, d = 0, n = 1, type = "const_n",alpha = 0.6, p = 1):
     return R
 
 #Getting edges and vertices from a dataframe
-def makeEV(segments):
+def makeEV(segments, thresh = 0):
     edges = []
     vertices = []
     for index, row in segments.iterrows():
@@ -136,17 +245,15 @@ def makeEV(segments):
         else:
             new_edge.length = math.sqrt((row['x1'] - row['x2'])**2 + (row['y1']-row['y2'])**2)
 
-        if 'LineWidth' in list(segments):
-            new_edge.width = row['LineWidth']
+        if 'Width' in list(segments):
+            new_edge.width = row['Width']
 
-        edges.append(new_edge)
-        vertices = vertices + [Point(row['x1'],row['y1'], row['id1']), Point(row['x2'],row['y2'],row['id2'])]
+        if new_edge.width != 0:
+            edges.append(new_edge)
+            vertices = vertices + [Point(row['x1'],row['y1'], row['id1']), Point(row['x2'],row['y2'],row['id2'])]
 
 
-    #Run through points and map ones that are
-    ## TODO: Adjust the thresholding step; make sure to add edge weighting stuff
-    thresh = 2*math.sqrt(2) #Will want mechanism for adjusting threshold to account for other cutoffs; or to refine sampling protocol
-
+    #Run through points and map ones that are the same
     for i in range(len(vertices)):
         for j in [index for index in range(len(vertices)) if index > i]:
             u = vertices[i]
@@ -160,7 +267,34 @@ def makeEV(segments):
 
     return vertices, edges
 
-def make_graph(vertices, edges):
+#takes list of parameters as input; otherwise sets up defaults
+#If params isn't none, has to be dict generated by function in GUI
+def make_graph(vertices, edges, params = None):
+    if params:
+        try:
+            thresh = params["thresh"].value
+            d = params["d"].value
+            n = params["n"].value
+            mode = params["DiamMode"].value
+            alpha = params["alpha"].value
+            prop = params["prop"].value
+        except KeyError:
+            print("Invalid parameter set. Using defaults.")
+            thresh = 0
+            d = 0
+            n = 1
+            mode = "const_n"
+            alpha = 0.6
+            prop = 1
+    else:
+        thresh = 0
+        d = 0
+        n = 1
+        mode = "const_n"
+        alpha = 0.6
+        prop = 1
+
+
     #Assumes GraphTool rather than GraphML or other light-weight option; add alternative for flexibility
     g = gt.Graph(directed = False)
 
@@ -169,7 +303,7 @@ def make_graph(vertices, edges):
 
     #Edge properties
     g.ep.length = g.new_edge_property("float")
-    g.ep.width = g.new_edge_property("int")
+    g.ep.width = g.new_edge_property("float")
     g.ep.res = g.new_edge_property("float")
     g.ep.vol = g.new_edge_property("float")
 
@@ -197,7 +331,7 @@ def make_graph(vertices, edges):
             g.ep.length[new_e] = e.length
             g.ep.width[new_e] = e.width
             ## TODO: Use function to calculate weight and volume
-            g.ep.res[new_e] = e.length/e.width**4
+            g.ep.res[new_e] = edge_resist(e.width, e.length, d, n, mode, alpha, prop)
             g.ep.vol[new_e] = e.width**2*e.length
     return g
 
@@ -215,7 +349,7 @@ def save_graph(g, orig_file_path, metadata = None):
 
 
 def displayGraph(g):
-    gt.graph_draw(g, pos = g.vp.pos, edge_pen_width=g.ep.width)
+    gt.graph_draw(g, pos = g.vp.pos, edge_pen_width=gt.prop_to_size(g.ep.width, mi = 1, ma = 10, power = 1))
     return
 
 def parse_name(filepath):
@@ -245,9 +379,34 @@ def appendRow(path, row):
             writer = csv.writer(f)
             writer.writerow(row)
         return
+#Takes a list of header names from parseHeader and returns a list with the function name and weight
+def headerFormatter(header):
+    names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
+    req_weight = ["Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean", "CheegerLimit","MinCut"]
 
-def functionLookup():
-    lookup = {}
+    out = []
+    excluded = []
+    for col in header:
+        parts = col.split(".",maxsplit=1)
+        name = parts[0]
+        weight = parts[1]
+
+        if name in names:
+            if name in req_weight:
+                out.append([name, weight])
+            else:
+                out.append([name])
+        else:
+            excluded.append(col)
+
+    if len(excluded) > 0:
+        print("The following columns were excluded:\n")
+        for c in excluded:
+            print(c)
+
+    return out
+
+
 
 #Opens interactive window for selecting "source" node of graph. Source required for max flow calculations.
 #Returns graph_tool vertex that was selected
@@ -287,9 +446,9 @@ def cost_calc(graph, weight = None):
             c = np.nan
     else:
         n_orig = sum(weight.get_array()[:])
-        mst = gt.min_splanning_tree(graph, weights = weight)
+        mst = gt.min_spanning_tree(graph, weights = weight)
         graph.set_edge_filter(mst)
-        n_new = sum(weight.get_array()[:])
+        n_new = sum(weight.get_array()[mst.get_array().astype("bool")])
         try:
             c = n_orig/n_new
         except ZeroDivisionError:

@@ -1,10 +1,15 @@
+#!/usr/bin/python3
+"""
+GUI main program
+"""
 import sys
 import math
 import pandas as pd
 from tkinter import *
 import tkinter.filedialog as filedialog
+from tkinter.messagebox import *
 from graph_functions import *
-#from Roi_to_graph import *
+from svgparser import *
 
 class Param():
     def __init__(self, id, longname, value=None, flag = False):
@@ -20,7 +25,8 @@ class MainWIndow(Tk):
         self.top = Menu(self, tearoff=False)
         #self.config(menu = self.top)
         file = Menu(self.top)
-        file.add_command(label = "Open single file...",command=self.openfile)
+        file.add_command(label = "Open csv...",command=self.openfile)
+        file.add_command(label = "Open SVG...",command=self.processimage)
         file.add_command(label = "Open folder...",command=self.openfolder)
         file.add_command(label = "Set save directory...",command=self.dummy)
         file.add_command(label = "Quit", command = self.quit)
@@ -32,7 +38,9 @@ class MainWIndow(Tk):
         self.top.add_cascade(label = "Options", menu = options)
 
         analysis = Menu(self.top)
-        options.add_command(label = "Graph metrics", command=self.batchstats)
+        analysis.add_command(label = "Single graph metrics...", command=self.batchstats)
+        analysis.add_command(label = "Batch graph metrics...", command = self.statsfromfile)
+        self.top.add_cascade(label = "Analysis", menu = analysis)
 
         #parameters
         self.left = Frame(self)
@@ -66,7 +74,7 @@ class MainWIndow(Tk):
 
     def optionpopup(self):
         pop = Toplevel(self)
-
+        BasicParams(pop).pack()
 
     def dummy(self):
         pass
@@ -93,31 +101,74 @@ class MainWIndow(Tk):
         else:
             pass
 
+    def processimage(self):
+        imagefile = filedialog.askopenfilename()
+        with open(imagefile) as f:
+            image = f.read()
+        paths = get_paths(image)
+        data_df, data_list, errors = process_movetos(paths)
+
+        for e in errors:
+            print(e)
+
+        pop = Toplevel(self)
+        ImageSaveOptions(data_df, pop).pack()
+
     # TODO: Replace with function that makes graph given other parameters etc.
     def run(self):
         if PARAMS["InFolder"].value is not None:
-            ## TODO: Start by reading in folder contents
-            ## TODO: Process graphs
-            ## TODO: Save graphs for processing
-            ## TODO: Propmpt when function is complete asking to run statistics
-            return #or return?
+            csvs, svgs = get_batch_files(PARAMS["InFolder"].value)
+            total = len(csvs) + len(svgs)
+            log = 0
+            if total == 0:
+                print("No valid files found.")
+            else:
+                print("{} files found. Beginning now ...".format(total))
+            if len(svgs) > 0:
+                question = "Split interections in SVGs? If yes, will use {} as minimum length. You can change this value in Options -> Other Options or by processing images individually.".format(PARAMS["thresh"].value)
+                split = askyesno(question)
+                for file in svgs:
+                    with open(file) as f:
+                        image = f.read()
+                    paths = get_paths(image)
+                    data_df, data_list, errors = process_movetos(paths)
+                    if split:
+                        min = PARAMS["thresh"].value
+                        datatmp = split_data(data_df, min, min)
+                        data_df = datatmp
+                    vertices, edges = makeEV(data_df)
+                    g = make_graph(vertices, edges, PARAMS)
+                    save_graph(g, file, metadata = PARAMS)
+                    print("File number {} of {} processed.".format(log, total))
+                    log += 1
+
+            if len(csvs) > 0:
+                for file in csvs:
+                    segs = check_csv(file)
+                    vertices, edges = makeEV(segs)
+                    g = make_graph(vertices, edges, PARAMS)
+                    save_graph(g, file, metadata=PARAMS)
+                    print("File number {} of {} processed.".format(log, total))
+                    log += 1
+
+            print("Use the Analysis menu to calculate graph metrics for the graphs produced.")
+            return
         elif PARAMS["InFile"].value is not None:
             #Read in file
             filename = PARAMS["InFile"].value
             if filename[-3::].lower() == "csv":
                 segs = check_csv(filename)
             elif filename[-3::].lower() == "svg":
-                ## TODO: Add SVG import function
-                print("To be implemented.")
+                print("Please use Open SVG... command in File menu.")
             else:
                 print("Incorrect file type. Please open CSV or SVG file.")
 
-            ## TODO: process single graph and save
-            vertices, edges = makeEV(segs)
-            g = make_graph(vertices, edges)
+            #Process single graph and save
+            vertices, edges = makeEV(segs, PARAMS["thresh"].value)
+            g = make_graph(vertices, edges, PARAMS)
             save_graph(g, filename, metadata=PARAMS)
 
-            ## TODO: Prompts
+            #Prompts
             pop = Toplevel()
             Button(pop, text = "Show Graph", command = lambda: displayGraph(g)).pack()
             Button(pop, text = "Run stats", command = lambda: self.batchstats(graph=g)).pack()
@@ -128,6 +179,102 @@ class MainWIndow(Tk):
     def batchstats(self,graph=None):
         menu = Toplevel(self)
         StatMenu(graph=graph, parent = menu).pack()
+
+
+
+    def statsfromfile(self):
+        folder = filedialog.askdirectory()
+        file_names = [folder + "/" + file for file in os.listdir(folder) if file.endswith(("xml.gz"))]
+        count = len(file_names)
+        message = "{} files to read. Create new file or add to existing?".format(count)
+        choice = askradio(message, ["New","Append"])
+
+        #Opening or setting up data output
+        if choice == "New":
+            outfile = filedialog.asksaveasfilename()
+            first = file_names.pop(0)
+            pop = Toplevel(self)
+            StatMenu(infile=first, outfile=outfile, parent=pop, verbose = False).pack()
+            pop.grab_set()
+            pop.focus_set()
+            pop.wait_window()
+        elif choice == "Append":
+            outfile = filedialog.askopenfilename()
+        else:
+            print("No option chosen.")
+            return
+
+        #Once we have a file to continue writing to, process remaining graphs
+        names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
+        req_weight = ["Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean", "CheegerLimit","MinCut"]
+
+        w = None
+        functionCalls = ["parse_name(path)", "path","g.num_vertices()","gt.vertex_average(g, \"total\")","g.num_edges()",
+                "sum(g.ep.length.get_array()[:])", "cost_calc(g, {})", "efficiency(g, {})", "performance(g,{})", "spectra(g,{})", "mean_btwn(g,{})[0]", "mean_btwn(g,{})[1]", "cheegerApprox(g,{})", "gt.min_cut(g,{})"]
+        lookup = dict(zip(names, functionCalls))
+
+        columns = headerFormatter(parseHeader(outfile))
+
+        if len(columns) == 0:
+            print("No valid columns.")
+            return
+        else:
+            for path in file_names:
+                g = gt.load_graph(path)
+                valid_weights = list(g.edge_properties.keys())
+
+                row = []
+                for col in columns:
+                    if len(col) == 2:
+                        if col[1] in valid_weights:
+                            w = "g.ep.{}".format(col[1])
+                        else:
+                            w = None
+                    function = lookup[col[0]]
+                    row.append(eval(function.format(w)))
+                appendRow(outfile, row)
+        print("{} files processed. Please check {} for data.".format(count, outfile))
+
+class ImageSaveOptions(Frame):
+    def __init__(self, indata, parent = None):
+        Frame.__init__(self, parent)
+        self.parent = parent
+        self.input = indata
+
+        self.min = StringVar()
+        self.min.set(0)
+
+        Label(self, text = "Split paths to create nodes at intersections?").pack()
+        Label(self, text = "Minimum length. Enter any non-numeric value to use existing minimum as cut-off.").pack(side = LEFT)
+        Entry(self, textvariable = self.min).pack(side = RIGHT)
+
+        Button(self, text = "Yes", command = self.split_and_save).pack(side = LEFT)
+        Button(self, text = "No", command = self.save_only).pack(side = RIGHT)
+
+    def split_and_save(self):
+        global PARAMS
+        minimum = self.min.get()
+        newDF = split_data(self.input, minimum)
+
+        filename = filedialog.asksaveasfilename()
+        newDF.to_csv(filename)
+        PARAMS["InFile"].value = filename
+
+        if self.parent is not None:
+            self.parent.destroy()
+        else:
+            self.destroy()
+
+    def save_only(self):
+        global PARAMS
+        filename = filedialog.asksaveasfilename()
+        self.input.to_csv(filename)
+        PARAMS["InFile"].value = filename
+
+        if self.parent is not None:
+            self.parent.destroy()
+        else:
+            self.destroy()
 
 class ParamDisplay(Frame):
     def __init__(self, parent=None):
@@ -142,8 +289,8 @@ class ParamDisplay(Frame):
             else:
                 color = "gray"
 
-            Label(self,text = param.longname,fg=color).grid(row=r,column=0)
-            Label(self,text=param.value,fg=color).grid(row=r,column=1)
+            Label(self,text = param.longname,fg=color, wraplength=200).grid(row=r,column=0)
+            Label(self,text=param.value,fg=color, wraplength=200).grid(row=r,column=1)
             r += 1
 
     def update(self):
@@ -152,15 +299,21 @@ class ParamDisplay(Frame):
         self.fillgrid()
 
 class StatMenu(Frame):
-    def __init__(self, graph = None, parent = None):
+    def __init__(self, graph = None, infile = None, outfile = None, parent = None, verbose = True):
         Frame.__init__(self, parent)
         self.parent = parent
+        self.outfile = outfile
+        self.verbose = verbose
 
         if graph is not None:
             self.graph = graph
             self.path = PARAMS["InFile"].value
         else:
-            self.path = filedialog.askopenfilename()
+            if infile is not None:
+                self.path = infile
+            else:
+                self.path = filedialog.askopenfilename()
+
             try:
                 graph = gt.load_graph(self.path)
                 self.graph = graph
@@ -195,14 +348,17 @@ class StatMenu(Frame):
                 self.weightselect.append(None)
             r += 1
 
+        if self.outfile is None:
+            self.save = IntVar()
+            Checkbutton(gridbox, text = "Save to file?", variable = self.save).grid(row = r, column = 0)
+
         button = Button(self, text = "Run", command = self.run)
         gridbox.pack()
         button.pack()
 
     def run(self):
         w = None
-        functionCalls = ["parse_name(self.path)", "self.path","self.graph.num_vertices()","gt.vertex_average(self.graph, \"total\")","self.graph.num_edges()",
-                "sum(self.graph.ep.length.get_array()[:])","cost_calc(self.graph, {})".format(w), "efficiency(self.graph, {})".format(w),"performance(self.graph,{})".format(w),"spectra(self.graph,{})".format(w),"mean_btwn(self.graph,{})[0]".format(w),"mean_btwn(self.graph,{})[1]".format(w),"cheegerApprox(self.graph,{})".format(w),"gt.min_cut(self.graph,{})".format(w)]
+        functionCalls = ["parse_name(self.path)", "self.path","self.graph.num_vertices()", "gt.vertex_average(self.graph, \"total\")","self.graph.num_edges()", "sum(self.graph.ep.length.get_array()[:])", "cost_calc(self.graph, {})", "efficiency(self.graph, {})", "performance(self.graph,{})", "spectra(self.graph,{})", "mean_btwn(self.graph,{})[0]", "mean_btwn(self.graph,{})[1]", "cheegerApprox(self.graph,{})", "gt.min_cut(self.graph,{})"]
 
         #Get the options and run
         header = []
@@ -212,16 +368,38 @@ class StatMenu(Frame):
             if self.choices[i].get() == 1:
                 function = functionCalls[i]
                 if self.weightselect[i] is not None:
-                    w = self.weightselect[i].get()
-                if w is None or w is "None":
+                    w_name = self.weightselect[i].get()
+                    if w_name == "None":
+                        w = w_name
+                    else:
+                        w = "self.graph.ep.{}".format(w_name)
+                if w is None:
                     header.append(self.names[i] + ".Unweighted")
                 else:
-                    header.append(self.names[i] + "." + w)
-                values.append(eval(function))
+                    header.append(self.names[i] + "." + w_name)
+                values.append(eval(function.format(w)))
 
         #Store and save
-        for i in range(len(header)):
-            print("{}: {}".format(header[i],values[i]))
+        if self.verbose:
+            for i in range(len(header)):
+                print("{}: {}".format(header[i],values[i]))
+        else:
+            if self.names[0] == "GraphID":
+                print("{} complete".format(self.names[0]))
+            else:
+                print("Analysis complete. Check for file.")
+
+        val_out = [[v] for v in values]
+        d = dict(zip(header, val_out))
+
+        if self.outfile is not None:
+            data = pd.DataFrame(d, index = [0])
+            data.to_csv(self.outfile, index=False)
+        else:
+            if self.save.get() == 1:
+                outfile = filedialog.asksaveasfilename()
+                data = pd.DataFrame(d, index = [0])
+                data.to_csv(outfile, index=False)
 
         if self.parent is not None:
             self.parent.destroy()
@@ -296,7 +474,7 @@ class SetDiamOptions(Frame):
                     else:
                         continue
                 try:
-                    PARAMS[key].value = value
+                    PARAMS[key].value = float(value)
                     PARAMS[key].flag = True
                 except KeyError:
                     pass
@@ -306,13 +484,63 @@ class SetDiamOptions(Frame):
         else:
             self.destroy()
 
+#Kludgy and hard-coded, but sufficient for now
+class BasicParams(Frame):
+    def __init__(self, parent=None):
+        Frame.__init__(self, parent)
+        self.parent = parent
+        self.pack()
+
+        #Variables
+        self.units = StringVar()
+        self.units.set(PARAMS["units"].value)
+        self.thresh = DoubleVar()
+        self.thresh.set(PARAMS["thresh"].value)
+
+        self.row1 = Frame(self)
+        self.row2 = Frame(self)
+
+        self.row1.pack()
+        self.row2.pack()
+
+        Label(self.row1, text="Units:").pack(side=LEFT)
+        Label(self.row2, text="Minimum distance between nodes:").pack(side=LEFT)
+
+        Entry(self.row1, textvariable = self.units).pack(side=RIGHT)
+        Entry(self.row2, textvariable = self.thresh).pack(side=RIGHT)
+
+        Button(self, text="Save and close", command = self.save_quit).pack()
+
+    def save_quit(self):
+        global PARAMS
+        PARAMS["units"].value = self.units.get()
+        PARAMS["thresh"].value = self.thresh.get()
+
+        if self.parent is not None:
+            self.parent.destroy()
+        else:
+            self.destroy()
+
+# TODO: add fault testing menus
 class OrderedFaultTest(Frame):
     def __init__(self, graph, parent = None):
         Frame.__init__(self, parent)
         self.parent = parent
 
-        self.graph = graph
-        self.out = StringVar()
+        if graph is None:
+            self.graph = gt.load_graph(filedialog.askopenfilename())
+        else:
+            self.graph = graph
+
+        self.weights = self.graph.edge_properties.keys()
+
+    def run(self):
+        g = self.graph
+        outfile = filedialog.asksaveasfilename()
+        if outfile:
+            fault_tolerance(g, outfile, )
+
+
 
 class IteratedFaultTest(Frame):
     def __init__(self, graph, parent = None):
@@ -320,7 +548,36 @@ class IteratedFaultTest(Frame):
         self.parent = parent
 
 
+#Modal dialog for radiobuttons
+def makeradio(parent, answers):
+    choices = []
+    result = StringVar()
+    for a in answers:
+        Radiobutton(parent, text = a, value = a, variable = result).pack()
+    choices.append(result)
+    return choices
 
+def fetch(input, output):
+    for item in input:
+        output.append(item.get())
+
+def show(select, out, popup):
+    fetch(select, out)
+    popup.destroy()
+
+def askradio(question, answers):
+    out = []
+    popup = Toplevel()
+    Label(popup, text = question).pack()
+    select = makeradio(popup, answers)
+    Button(popup, text = "OK", command = (lambda: show(select, out, popup))).pack()
+    popup.grab_set()
+    popup.focus_set()
+    popup.wait_window()
+
+    return out[0]
+
+#Generate initial parameter list
 def init_params(ver):
     params_list = [
         Param("InFile", "Input filename"),
@@ -332,7 +589,6 @@ def init_params(ver):
         Param("prop","Vessel area to vein area ratio", 1, True),
         Param("d","Fixed vessel size"),
         Param("thresh","Cut-off distance for shared end-points",2*math.sqrt(2),True),
-        Param("scale","Pixels per unit")
     ]
     params_dict = dict([(param.id, param) for param in params_list])
 
@@ -354,6 +610,7 @@ def mode_flags():
     if mode != "taper":
         PARAMS["alpha"].flag = False
 
+#Main method
 if __name__ == "__main__":
     PARAMS = init_params("dict")
 

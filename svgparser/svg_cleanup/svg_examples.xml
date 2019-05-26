@@ -1,0 +1,22 @@
+Examples of path elements: ------------------------------
+
+<path
+   style="opacity:1;fill:none;fill-opacity:1;stroke:#4cff3c;stroke-width:0.44999999;stroke-linecap:butt;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+   d="m 77.283137,130.69933 -0.223242,-0.16245 -0.507905,-0.48428 -0.05906,-1.16936 -0.03543,-3.28367 0.14174,-3.43722 -0.04725,-2.51591 -0.08268,-4.9255 0.129929,-1.24023 -0.02363,-2.87026 v -3.30729 l -0.01181,-3.07102 0.01181,-4.500277 0.03543,-3.519903 -0.01181,-2.787574 0.05906,-2.586775 0.05906,-2.846633 0.2008,-3.22461 0.212612,-2.09068 0.531529,-4.523903 1.334727,-4.346728"
+   id="path951"
+   inkscape:connector-curvature="0"
+   sodipodi:nodetypes="ccccccccccccccccccccc" 
+/>
+
+<path
+   style="opacity:1;fill:none;fill-opacity:1;stroke:#4cff3c;stroke-width:0.175;stroke-linecap:butt;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+    d="m 76.449107,148.52175 0.748355,1.02899 1.122532,0.28063 0.818512,0.32741 1.099146,0.46772 0.631425,0.42095 2.478924,1.40317 0.444336,0.3274 0.374176,0.0468 2.502313,1.16931 1.005602,0.30402 1.028985,0.11693 1.753958,-0.0234 0.795126,0.30402 1.824114,0.23386 1.052375,-0.0935 1.028988,-0.25724 3.035512,-0.81756"
+   id="path2311"
+   inkscape:connector-curvature="0" />
+
+ <path
+       style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.60854167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="M 39.530739,103.09394 39.389104,100.8705"
+       id="path1484-2-9-5" />
+
+Examples of beginning metadata: --------------------

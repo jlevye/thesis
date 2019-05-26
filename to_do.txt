@@ -1,9 +1,0 @@
-TO DO
------
-
-1. Incorporate intersection splitting into main proccessing
-2. Merge batch and single file scripts; add in GUI choice for file or folder
-3. Build more gui structure
-4. Add user options for parameterization
-5. Build in stats in a more user-friendly way
-6. Add additional stat calculations
