@@ -180,10 +180,14 @@ def split_data(data, minimum=1):
     segs = data.values.tolist()
     new_data = pd.DataFrame(columns = ["x1","y1","x2","y2","Width","Length"])
 
-    if issnumeric(minimum):
-        minimum = float(minimum)
-    else:
-        minimum = min(segs["Length"])
+    if isinstance(minimum, int) or isinstance(minimum, float):
+        minimum = minimum
+    elif isinstance(minimum, str):
+        if minimum.isnumeric():
+            minimum = float(minimum)
+        else:
+            minimum = min(segs["Length"])
+            
     for seg in segs:
         crosses = [s for s in segs if s is not seg]
         splits = findSplits(seg, crosses, minimum)
