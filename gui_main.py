@@ -35,6 +35,7 @@ class MainWIndow(Tk):
         options = Menu(self.top)
         options.add_command(label = "Set vessel mode",command=self.vesseloptionpopup)
         options.add_command(label="Other options",command = self.optionpopup)
+        options.add_command(label = "Set source vertex", )
         self.top.add_cascade(label = "Options", menu = options)
 
         analysis = Menu(self.top)
@@ -70,10 +71,12 @@ class MainWIndow(Tk):
 
     def vesseloptionpopup(self):
         pop = Toplevel(self)
+        pop.title("Vessel diameter settings")
         SetDiamOptions(pop).pack()
 
     def optionpopup(self):
         pop = Toplevel(self)
+        pop.title("Vessel diameter settings")
         BasicParams(pop).pack()
 
     def dummy(self):
@@ -112,20 +115,20 @@ class MainWIndow(Tk):
             print(e)
 
         pop = Toplevel(self)
+        pop.title("Image processing options")
         ImageSaveOptions(data_df, pop).pack()
 
-    # TODO: Replace with function that makes graph given other parameters etc.
     def run(self):
         if PARAMS["InFolder"].value is not None:
             csvs, svgs = get_batch_files(PARAMS["InFolder"].value)
             total = len(csvs) + len(svgs)
-            log = 0
+            log = 1
             if total == 0:
                 print("No valid files found.")
             else:
                 print("{} files found. Beginning now ...".format(total))
             if len(svgs) > 0:
-                question = "Split interections in SVGs? If yes, will use {} as minimum length. You can change this value in Options -> Other Options or by processing images individually.".format(PARAMS["thresh"].value)
+                question = "Split interections in SVGs? If yes, will use the existing minimum edge length cut-off for inclusion of new edges. You can change this value by processing images individually."
                 split = askyesno(question)
                 for file in svgs:
                     with open(file) as f:
@@ -133,10 +136,12 @@ class MainWIndow(Tk):
                     paths = get_paths(image)
                     data_df, data_list, errors = process_movetos(paths)
                     if split:
-                        min = PARAMS["thresh"].value
-                        datatmp = split_data(data_df, min, min)
+                        min = "na"
+                        datatmp = split_data(data_df, min)
                         data_df = datatmp
-                    vertices, edges = makeEV(data_df)
+                    data_df["id1"] = [i for i in range(len(data_df))]
+                    data_df["id2"] = [i for i in range(len(data_df), 2*len(data_df))]
+                    vertices, edges = makeEV(data_df,PARAMS["thresh"].value)
                     g = make_graph(vertices, edges, PARAMS)
                     save_graph(g, file, metadata = PARAMS)
                     print("File number {} of {} processed.".format(log, total))
@@ -145,7 +150,7 @@ class MainWIndow(Tk):
             if len(csvs) > 0:
                 for file in csvs:
                     segs = check_csv(file)
-                    vertices, edges = makeEV(segs)
+                    vertices, edges = makeEV(segs,PARAMS["thresh"].value)
                     g = make_graph(vertices, edges, PARAMS)
                     save_graph(g, file, metadata=PARAMS)
                     print("File number {} of {} processed.".format(log, total))
@@ -163,24 +168,43 @@ class MainWIndow(Tk):
             else:
                 print("Incorrect file type. Please open CSV or SVG file.")
 
+            outfolder = filedialog.askdirectory()
             #Process single graph and save
             vertices, edges = makeEV(segs, PARAMS["thresh"].value)
             g = make_graph(vertices, edges, PARAMS)
-            save_graph(g, filename, metadata=PARAMS)
 
             #Prompts
-            pop = Toplevel()
-            Button(pop, text = "Show Graph", command = lambda: displayGraph(g)).pack()
-            Button(pop, text = "Run stats", command = lambda: self.batchstats(graph=g)).pack()
+            choice = ["save"]
+            pop = SimplePopUp()
+            pop.title("Save...")
+
+            pop.var = StringVar()
+            Radiobutton(pop, text = "Show Graph", variable = pop.var, value = "show").pack()
+            Radiobutton(pop, text = "Show and set source vertex",variable = pop.var, value = "set").pack()
+            Radiobutton(pop, text = "Save now without viewing", variable = pop.var, value = "save").pack()
+
+            Button(pop, text = "Continue",command = lambda: store_and_close(pop, choice)).pack()
+            pop.wait_window()
+
+            if choice[0] == "show":
+                displayGraph(g)
+            elif choice[0] == "set":
+                setSource(g)
+            else:
+                pass
+            save_graph(g, filename, outfolder = outfolder, metadata=PARAMS)
+
+            next = askokcancel("Continue","Graph saved successfully. Run graph stats now?")
+            if next:
+                self.batchstats(g)
 
         else:
             print("No file or folder selected. Please open a file to process and try again.")
 
     def batchstats(self,graph=None):
         menu = Toplevel(self)
+        menu.title("Graph metrics")
         StatMenu(graph=graph, parent = menu).pack()
-
-
 
     def statsfromfile(self):
         folder = filedialog.askdirectory()
@@ -205,12 +229,12 @@ class MainWIndow(Tk):
             return
 
         #Once we have a file to continue writing to, process remaining graphs
-        names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
+        names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","MaxWidth","AvgWidth","Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
         req_weight = ["Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean", "CheegerLimit","MinCut"]
 
         w = None
         functionCalls = ["parse_name(path)", "path","g.num_vertices()","gt.vertex_average(g, \"total\")","g.num_edges()",
-                "sum(g.ep.length.get_array()[:])", "cost_calc(g, {})", "efficiency(g, {})", "performance(g,{})", "spectra(g,{})", "mean_btwn(g,{})[0]", "mean_btwn(g,{})[1]", "cheegerApprox(g,{})", "gt.min_cut(g,{})"]
+                "sum(g.ep.length.get_array()[:])","widest(g)","avgwidth(g)", "cost_calc(g, {})", "efficiency(g, {})", "performance(g,{})", "spectra(g,{})", "mean_btwn(g,{})[0]", "mean_btwn(g,{})[1]", "cheegerApprox(g,{})", "gt.min_cut(g,{})"]
         lookup = dict(zip(names, functionCalls))
 
         columns = headerFormatter(parseHeader(outfile))
@@ -323,7 +347,7 @@ class StatMenu(Frame):
 
         self.weights = ["None"]+list(graph.edge_properties.keys())
 
-        self.names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","Cost","Efficiency","TransportPerformance","LaPlacianSpectra",
+        self.names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","Cost","MaxWidth","AvgWidth","Efficiency","TransportPerformance","LaPlacianSpectra",
             "EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
 
         req_weight = ["Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean", "CheegerLimit","MinCut"]
@@ -358,7 +382,7 @@ class StatMenu(Frame):
 
     def run(self):
         w = None
-        functionCalls = ["parse_name(self.path)", "self.path","self.graph.num_vertices()", "gt.vertex_average(self.graph, \"total\")","self.graph.num_edges()", "sum(self.graph.ep.length.get_array()[:])", "cost_calc(self.graph, {})", "efficiency(self.graph, {})", "performance(self.graph,{})", "spectra(self.graph,{})", "mean_btwn(self.graph,{})[0]", "mean_btwn(self.graph,{})[1]", "cheegerApprox(self.graph,{})", "gt.min_cut(self.graph,{})"]
+        functionCalls = ["parse_name(self.path)", "self.path","self.graph.num_vertices()", "gt.vertex_average(self.graph, \"total\")","self.graph.num_edges()", "sum(self.graph.ep.length.get_array()[:])","widest(self.graph)","avgwidth(self.graph)", "cost_calc(self.graph, {})", "efficiency(self.graph, {})", "performance(self.graph,{})", "spectra(self.graph,{})", "mean_btwn(self.graph,{})[0]", "mean_btwn(self.graph,{})[1]", "cheegerApprox(self.graph,{})", "gt.min_cut(self.graph,{})"]
 
         #Get the options and run
         header = []
@@ -547,6 +571,21 @@ class IteratedFaultTest(Frame):
         Frame.__init__(self, parent)
         self.parent = parent
 
+#Creates a super simple version of a toplevel popup that includes a variable
+class SimplePopUp(Toplevel):
+    def __init__(self, parent = None):
+        Toplevel.__init__(self, parent)
+        self.var = StringVar()
+
+#Get a value and quite
+def store_and_close(win, var = None):
+    out = win.var.get()
+    win.destroy()
+    if var is not None:
+        var[0] = out
+        return
+    else:
+        return out
 
 #Modal dialog for radiobuttons
 def makeradio(parent, answers):
@@ -615,5 +654,8 @@ if __name__ == "__main__":
     PARAMS = init_params("dict")
 
     win = MainWIndow()
+    win.title("LeafGrapher")
+    img = PhotoImage(master = win,file="teenyleaf.png")
+    win.wm_iconphoto(True, img)
     win.config(menu=win.top)
     win.mainloop()

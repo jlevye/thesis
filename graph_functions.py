@@ -177,6 +177,7 @@ def findSplits(row, crosses, minimum=1):
     return new_segs
 
 def split_data(data, minimum=1):
+    minlength = min(data["Length"])
     segs = data.values.tolist()
     new_data = pd.DataFrame(columns = ["x1","y1","x2","y2","Width","Length"])
 
@@ -186,8 +187,8 @@ def split_data(data, minimum=1):
         if minimum.isnumeric():
             minimum = float(minimum)
         else:
-            minimum = min(segs["Length"])
-            
+            minimum = minlength
+
     for seg in segs:
         crosses = [s for s in segs if s is not seg]
         splits = findSplits(seg, crosses, minimum)
@@ -224,13 +225,13 @@ def edge_resist(Diam, l, d = 0, n = 1, type = "const_n",alpha = 0.6, p = 1):
     if type == "const_n": #How big can n circles be inside size Diam*p?
         small_area = area/n
         d = 2*math.sqrt(small_area/math.pi)
-    elif type == "const_d": #How many circles of size d it inside Diam*p?
+    elif type == "const_d": #How many circles of size d it inside Diam*p? - must be at least 1
         small_area = math.pi*(d/2)**2
-        n = floor(area/small_area)
-    elif type == "taper": #How many circles of Diam^alpha fit in Diam*p?
+        n = max(1,math.floor(area/small_area))
+    elif type == "taper": #How many circles of Diam^alpha fit in Diam*p? - must be at least 1
         d = Diam**alpha
         small_area = math.pi*(d/2)**2
-        n = floor(area/small_area)
+        n = max(1,math.floor(area/small_area))
     else:
         print("Incorrect mode.")
         return
@@ -311,6 +312,10 @@ def make_graph(vertices, edges, params = None):
     g.ep.res = g.new_edge_property("float")
     g.ep.vol = g.new_edge_property("float")
 
+    #Graph properties; set equal to "unset" default
+    g.gp.source = g.new_graph_property("int")
+    g.gp.source = -1
+
     #Make vertices
     for v in vertices:
         if v.keep:
@@ -340,9 +345,12 @@ def make_graph(vertices, edges, params = None):
     return g
 
 #Includes option for printing metadata
-def save_graph(g, orig_file_path, metadata = None):
+def save_graph(g, orig_file_path, outfolder = None, metadata = None):
     csv_name = orig_file_path.split("/")[-1]
     graph_name = csv_name.split(".")[0] + ".xml.gz"
+    if outfolder is not None:
+        os.chdir(outfolder)
+
     g.save(graph_name)
 
     if metadata:
@@ -385,7 +393,7 @@ def appendRow(path, row):
         return
 #Takes a list of header names from parseHeader and returns a list with the function name and weight
 def headerFormatter(header):
-    names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
+    names = ["GraphID", "FIlepath","NVertices","AvgDegree","NEdges","TotalLength","MaxWidth","AvgWidth","Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean","EdgeBetweennessSD","CheegerLimit","MinCut"]
     req_weight = ["Cost","Efficiency","TransportPerformance","LaPlacianSpectra","EdgeBetweennessMean", "CheegerLimit","MinCut"]
 
     out = []
@@ -414,14 +422,16 @@ def headerFormatter(header):
 
 #Opens interactive window for selecting "source" node of graph. Source required for max flow calculations.
 #Returns graph_tool vertex that was selected
+#Also saves as a graph property for future use
 def setSource(g):
-    coord, filter = gt.interactive_window(g, pos = g.vp.pos)
+    coord, filter = gt.interactive_window(g, pos = g.vp.pos, edge_pen_width=gt.prop_to_size(g.ep.width, mi = 1, ma = 10, power = 1))
 
     if sum(filter.get_array()) != 1:
         print("Select exactly one source node.")
         return
     else:
         index = np.where(filter.get_array()==1)[0][0]
+        g.gp.source = index
         source = g.vertex(index)
         return source
 
@@ -478,7 +488,11 @@ def performance(graph, weight = None):
     return p
 
 def component_size(graph):
-    map = gt.label_largest_component(graph)
+    root = graph.gp.source
+    if root >= 0:
+        map = gt.label_out_component(graph, root)
+    else:
+        map = gt.label_largest_component(graph)
     return sum(map.a[:])
 
 def mean_btwn(graph,weight = None, mode = "edge"):
@@ -486,6 +500,14 @@ def mean_btwn(graph,weight = None, mode = "edge"):
     mean = stats.mean(ebtwn.get_array()[:])
     sd = stats.stdev(ebtwn.get_array()[:])
     return mean, sd
+
+def widest(g):
+    return max(g.ep.width.get_array()[:])
+
+def avgwidth(g):
+    total_vol = sum(g.ep.vol.get_array()[:])
+    total_len = sum(g.ep.length.get_array()[:])
+    return total_vol/total_len
 
 #Graph is a graph data structure
 #Outfile is the path to save the output (as a text CSV)
@@ -543,9 +565,14 @@ def fault_tolerance(graph, outfile, mode = "random", weight = None, ascending=Tr
 
 #Variant fault tolerence test - N runs of edge removal until component connected to source is chosen proportion of orig size
 #Propmpts for a source node if none is given
-def iterateFault(graph, source = None, N = 100, prop = 0.5):
-    if source is None or source.is_valid() is False:
+def iterateFault(graph, N = 100, prop = 0.5):
+    if graph.gp.source = -1:
         source = setSource(graph)
+    else:
+        try:
+            source = graph.vertex(g.gp.source)
+        except ValueError:
+            source = setSource(graph)
     total = sum(gt.label_out_component(graph, source).a[:])
     stop = prop*total
 
@@ -565,16 +592,27 @@ def iterateFault(graph, source = None, N = 100, prop = 0.5):
         results[i] = count
     return results
 
-#Returns a list, sorted largest to smallest, of real non-zero eigenvalues of the graph Laplacian
-def spectra(graph, weight = None):
+#Returns a list, sorted largest to smallest, of "return" non-zero eigenvalues of the graph Laplacian (default= 100 values)
+#Requires g to be undirected, else L is not symmetrical
+#Can also return Cheeger Approx
+def spectra(graph, numout = 100, weight = None, descending = True):
     l = gt.laplacian(graph, weight = weight)
-    eigenval, eigenvec = scipy.sparse.linalg.eigs(l)
-    real_eigen = [i.real for i in eigenval if i.imag == 0]
-    return sorted(real_eigen, reverse = True)
+    n = graph.num_vertices()
+    eigenval = scipy.sparse.linalg.eigsh(l, k = n-1, which = "BE", )
+    #All will be real for symmetrical graph; instead rounding to 6 decimal places
+    eigen_out = [round(i, 6) for i in eigenval]
+    #Make sure lambda_0 = 0
+    #If it isn't, ask if user wants to continue TODO - error handling
+    # if eigen_out[0] != 0:
+    #     response = messagebox.askokcancel(message="Smallest eigenvalue is non-zero. This indicates a potential problem with the data. Generate output anyway?")
+    #
+    #TODO uncomment after deciding if keeping
+    idx = np.round(np.linspace(0, n-2, 100)).astype(int)
+    #Replace real_eigen with real_eigen(idx)
 
 
 def cheegerApprox(graph, weight = None):
-        eigenval = spectra(graph, weight)
+        eigenval = scipy
         sse = eigenval[-2]
         cheeger = math.sqrt(2*sse)
         return cheeger
